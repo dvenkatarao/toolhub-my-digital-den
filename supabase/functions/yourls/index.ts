@@ -54,6 +54,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('Starting yourls function...');
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -64,21 +66,40 @@ Deno.serve(async (req) => {
       }
     );
 
+    console.log('Getting user...');
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (userError || !user) {
+    if (userError) {
+      console.error('User error:', userError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Authentication error', details: userError.message }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!user) {
+      console.error('No user found');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - no user' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('User authenticated:', user.id);
+
     // Get user's plan
-    const { data: profile } = await supabase
+    console.log('Fetching profile for user:', user.id);
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('plan')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
+    }
+    
+    console.log('Profile data:', profile);
 
     const isPremium = profile?.plan === 'PREMIUM';
 
