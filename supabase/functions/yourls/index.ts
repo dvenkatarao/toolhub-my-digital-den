@@ -54,41 +54,44 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Starting yourls function...');
+    const authHeader = req.headers.get('Authorization');
+    console.log('Auth header present:', !!authHeader);
+    
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );
 
-    console.log('Getting user...');
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) {
       console.error('User error:', userError);
       return new Response(
-        JSON.stringify({ error: 'Authentication error', details: userError.message }),
+        JSON.stringify({ error: 'Authentication failed', details: userError.message }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
     if (!user) {
-      console.error('No user found');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized - no user' }),
+        JSON.stringify({ error: 'User not found' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('User authenticated:', user.id);
-
     // Get user's plan
-    console.log('Fetching profile for user:', user.id);
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('plan')
@@ -98,8 +101,6 @@ Deno.serve(async (req) => {
     if (profileError) {
       console.error('Profile fetch error:', profileError);
     }
-    
-    console.log('Profile data:', profile);
 
     const isPremium = profile?.plan === 'PREMIUM';
 

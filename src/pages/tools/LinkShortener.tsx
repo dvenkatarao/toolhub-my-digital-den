@@ -82,12 +82,13 @@ export default function LinkShortener() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session) {
+      if (!session?.access_token) {
         toast({
-          title: "Error",
+          title: "Authentication Required",
           description: "Please sign in to use this feature",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
@@ -97,6 +98,9 @@ export default function LinkShortener() {
           url: url,
           keyword: customKeyword || undefined,
           title: title || undefined,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -151,10 +155,13 @@ export default function LinkShortener() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session?.access_token) return;
 
       const { data, error } = await supabase.functions.invoke('yourls', {
         body: { action: 'db-stats' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) throw error;
