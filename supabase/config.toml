@@ -1,1 +1,4 @@
 project_id = "vbaxatdwsvivkqrxiqgr"
+
+[functions.yourls]
+verify_jwt = true
