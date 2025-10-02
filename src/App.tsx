@@ -45,8 +45,8 @@ const App = () => (
               >
                 <Route index element={<DashboardHome />} />
                 <Route path="link-shortener" element={<LinkShortener />} />
-                <Route path="encrypted-text" element={<EncryptedText title="Encrypted Text Sender" description="Send encrypted messages securely" icon={Shield} />} />
-                <Route path="temp-email" element={<TempEmail title="Temporary Email" description="Create disposable email addresses" icon={Mail} />} />
+                <Route path="encrypted-text" element={<EncryptedText />} />
+                <Route path="temp-email" element={<TempEmail />} />
                 <Route path="image-compressor" element={<ToolPlaceholder title="Image Compressor" description="Compress images without losing quality" icon={FileImage} />} />
                 <Route path="pdf-converter" element={<ToolPlaceholder title="PDF Converter" description="Convert files to and from PDF" icon={FileText} />} />
                 <Route path="password-manager" element={<ToolPlaceholder title="Password Manager" description="Securely store and manage passwords" icon={Lock} />} />
