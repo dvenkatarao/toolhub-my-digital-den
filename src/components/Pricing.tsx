@@ -2,8 +2,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const Pricing = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handlePlanClick = (planName: string) => {
+    if (planName === "Free Forever") {
+      navigate(user ? '/dashboard' : '/auth/signup');
+    } else {
+      navigate(user ? '/dashboard/subscription' : '/auth/signup');
+    }
+  };
+
   const plans = [
     {
       name: "Free Forever",
@@ -26,7 +39,7 @@ const Pricing = () => {
     },
     {
       name: "Personal Pro",
-      price: "$4.99",
+      price: "$9.99",
       period: "month",
       description: "Everything you need for complete digital productivity",
       badge: "Most Popular",
@@ -115,6 +128,7 @@ const Pricing = () => {
                     }`}
                     variant={plan.variant}
                     size="lg"
+                    onClick={() => handlePlanClick(plan.name)}
                   >
                     <Zap size={16} className="mr-2" />
                     {plan.cta}
@@ -140,15 +154,15 @@ const Pricing = () => {
             <div className="grid md:grid-cols-3 gap-6 mb-6">
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Individual apps</p>
-                <p className="text-2xl font-bold text-destructive line-through">$24.99/month</p>
+                <p className="text-2xl font-bold text-destructive line-through">$34.99/month</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">ToolHub Personal Pro</p>
-                <p className="text-2xl font-bold text-primary">$4.99/month</p>
+                <p className="text-2xl font-bold text-primary">$9.99/month</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">You save</p>
-                <p className="text-2xl font-bold text-accent">$240/year</p>
+                <p className="text-2xl font-bold text-accent">$300/year</p>
               </div>
             </div>
             <p className="text-muted-foreground">

@@ -7,6 +7,9 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isPremium: boolean;
+  subscriptionEnd: string | null;
+  checkSubscription: () => Promise<void>;
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -19,7 +22,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
+  const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const checkSubscription = async () => {
+    if (!session) {
+      setIsPremium(false);
+      setSubscriptionEnd(null);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      setIsPremium(data?.subscribed || false);
+      setSubscriptionEnd(data?.subscription_end || null);
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+      setIsPremium(false);
+      setSubscriptionEnd(null);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener
@@ -28,6 +58,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Check subscription status after auth change
+        if (session) {
+          setTimeout(() => {
+            checkSubscription();
+          }, 0);
+        } else {
+          setIsPremium(false);
+          setSubscriptionEnd(null);
+        }
       }
     );
 
@@ -36,6 +76,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      if (session) {
+        setTimeout(() => {
+          checkSubscription();
+        }, 0);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -111,6 +157,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     session,
     loading,
+    isPremium,
+    subscriptionEnd,
+    checkSubscription,
     signUp,
     signIn,
     signOut,

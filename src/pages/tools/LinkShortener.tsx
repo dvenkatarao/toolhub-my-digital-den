@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link2, Copy, ExternalLink, Crown, BarChart3, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import QRCode from 'qrcode';
 
@@ -26,26 +27,15 @@ export default function LinkShortener() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ShortenedUrl | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [isPremium, setIsPremium] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const { toast } = useToast();
+  const { session, isPremium } = useAuth();
 
   useEffect(() => {
-    checkPremiumStatus();
-  }, []);
-
-  const checkPremiumStatus = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('plan')
-        .eq('user_id', user.id)
-        .single();
-      
-      setIsPremium(profile?.plan === 'PREMIUM');
+    if (isPremium) {
+      loadStats();
     }
-  };
+  }, [isPremium]);
 
   const generateQRCode = async (url: string) => {
     try {

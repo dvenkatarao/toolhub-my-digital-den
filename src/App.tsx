@@ -15,7 +15,8 @@ import VerifyEmail from "./pages/auth/VerifyEmail";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LinkShortener from "./pages/tools/LinkShortener";
 import ToolPlaceholder from "./pages/tools/ToolPlaceholder";
-import { Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings, CreditCard } from "lucide-react";
+import { Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings } from "lucide-react";
+import Subscription from "./pages/Subscription";
 
 const queryClient = new QueryClient();
 
@@ -52,7 +53,7 @@ const App = () => (
                 <Route path="photo-library" element={<ToolPlaceholder title="Photo Library" description="Store and organize your photos" icon={ImageIcon} />} />
                 <Route path="mortgage-calculator" element={<ToolPlaceholder title="Mortgage Calculator" description="Calculate mortgage payments and rates" icon={Calculator} />} />
                 <Route path="settings" element={<ToolPlaceholder title="Settings" description="Manage your account settings" icon={Settings} />} />
-                <Route path="subscription" element={<ToolPlaceholder title="Subscription" description="Manage your subscription plan" icon={CreditCard} />} />
+                <Route path="subscription" element={<Subscription />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
