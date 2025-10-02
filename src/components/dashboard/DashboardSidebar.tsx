@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Link2,
-  QrCode,
   Mail,
   Shield,
   FileImage,
@@ -35,7 +34,6 @@ import { cn } from '@/lib/utils';
 
 const quickTools = [
   { title: 'Link Shortener', url: '/dashboard/link-shortener', icon: Link2 },
-  { title: 'QR Generator', url: '/dashboard/qr-generator', icon: QrCode },
   { title: 'Encrypted Text', url: '/dashboard/encrypted-text', icon: Shield },
   { title: 'Temporary Email', url: '/dashboard/temp-email', icon: Mail },
 ];

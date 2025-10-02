@@ -2,7 +2,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Link, 
-  QrCode, 
   Shield, 
   Mail, 
   Image as ImageIcon, 
@@ -18,13 +17,7 @@ const Features = () => {
       icon: Link,
       name: "Link Shortener",
       description: "Share cleaner links",
-      detail: "Transform long URLs into memorable short links with custom domains and click tracking."
-    },
-    {
-      icon: QrCode,
-      name: "QR Generator",
-      description: "Quick codes for everything",
-      detail: "Generate QR codes for URLs, text, contacts, and more with customizable designs."
+      detail: "Transform long URLs into memorable short links with QR codes and click tracking."
     },
     {
       icon: Shield,

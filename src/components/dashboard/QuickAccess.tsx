@@ -1,11 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Star, Link2, QrCode, FileImage, Shield } from 'lucide-react';
+import { Star, Link2, FileImage, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 const favoriteTools = [
   { name: 'Link Shortener', icon: Link2, url: '/dashboard/link-shortener', color: 'text-blue-500' },
-  { name: 'QR Generator', icon: QrCode, url: '/dashboard/qr-generator', color: 'text-purple-500' },
   { name: 'Image Compressor', icon: FileImage, url: '/dashboard/image-compressor', color: 'text-green-500' },
   { name: 'Encrypted Text', icon: Shield, url: '/dashboard/encrypted-text', color: 'text-orange-500' },
 ];
@@ -21,7 +20,7 @@ export function QuickAccess() {
         <CardDescription>Your most used productivity tools</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {favoriteTools.map((tool) => (
             <Link
               key={tool.name}

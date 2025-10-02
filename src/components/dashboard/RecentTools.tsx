@@ -1,11 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link2, QrCode, FileImage, Calculator, Clock } from 'lucide-react';
+import { Link2, FileImage, Calculator, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 const recentTools = [
   { name: 'Link Shortener', icon: Link2, url: '/dashboard/link-shortener', lastUsed: '2 hours ago' },
-  { name: 'QR Generator', icon: QrCode, url: '/dashboard/qr-generator', lastUsed: '5 hours ago' },
   { name: 'Image Compressor', icon: FileImage, url: '/dashboard/image-compressor', lastUsed: 'Yesterday' },
   { name: 'Mortgage Calculator', icon: Calculator, url: '/dashboard/mortgage-calculator', lastUsed: '3 days ago' },
 ];

@@ -15,7 +15,7 @@ import VerifyEmail from "./pages/auth/VerifyEmail";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LinkShortener from "./pages/tools/LinkShortener";
 import ToolPlaceholder from "./pages/tools/ToolPlaceholder";
-import { QrCode, Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings, CreditCard } from "lucide-react";
+import { Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings, CreditCard } from "lucide-react";
 
 const queryClient = new QueryClient();
 
@@ -42,7 +42,6 @@ const App = () => (
               >
                 <Route index element={<DashboardHome />} />
                 <Route path="link-shortener" element={<LinkShortener />} />
-                <Route path="qr-generator" element={<ToolPlaceholder title="QR Generator" description="Generate QR codes for any content" icon={QrCode} />} />
                 <Route path="encrypted-text" element={<ToolPlaceholder title="Encrypted Text Sender" description="Send encrypted messages securely" icon={Shield} />} />
                 <Route path="temp-email" element={<ToolPlaceholder title="Temporary Email" description="Create disposable email addresses" icon={Mail} />} />
                 <Route path="image-compressor" element={<ToolPlaceholder title="Image Compressor" description="Compress images without losing quality" icon={FileImage} />} />
