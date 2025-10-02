@@ -14,6 +14,8 @@ import SignUp from "./pages/auth/SignUp";
 import VerifyEmail from "./pages/auth/VerifyEmail";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LinkShortener from "./pages/tools/LinkShortener";
+import TempEmail from "./pages/tools/TempEmail";
+import EncryptedText from "./pages/tools/EncryptedText";
 import ToolPlaceholder from "./pages/tools/ToolPlaceholder";
 import { Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings } from "lucide-react";
 import Subscription from "./pages/Subscription";
@@ -43,8 +45,8 @@ const App = () => (
               >
                 <Route index element={<DashboardHome />} />
                 <Route path="link-shortener" element={<LinkShortener />} />
-                <Route path="encrypted-text" element={<ToolPlaceholder title="Encrypted Text Sender" description="Send encrypted messages securely" icon={Shield} />} />
-                <Route path="temp-email" element={<ToolPlaceholder title="Temporary Email" description="Create disposable email addresses" icon={Mail} />} />
+                <Route path="encrypted-text" element={<EncryptedText title="Encrypted Text Sender" description="Send encrypted messages securely" icon={Shield} />} />
+                <Route path="temp-email" element={<TempEmail title="Temporary Email" description="Create disposable email addresses" icon={Mail} />} />
                 <Route path="image-compressor" element={<ToolPlaceholder title="Image Compressor" description="Compress images without losing quality" icon={FileImage} />} />
                 <Route path="pdf-converter" element={<ToolPlaceholder title="PDF Converter" description="Convert files to and from PDF" icon={FileText} />} />
                 <Route path="password-manager" element={<ToolPlaceholder title="Password Manager" description="Securely store and manage passwords" icon={Lock} />} />
