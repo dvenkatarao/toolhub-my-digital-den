@@ -57,10 +57,20 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     console.log('Auth header present:', !!authHeader);
     
-    if (!authHeader) {
+    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: 'Missing or invalid authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    if (!YOURLS_SIGNATURE) {
+      console.error('YOURLS_API_SIGNATURE is not configured');
+      return new Response(
+        JSON.stringify({ error: 'Server misconfiguration', details: 'YOURLS_API_SIGNATURE not set' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
@@ -69,12 +79,12 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY')!,
       {
         global: {
-          headers: { Authorization: authHeader },
+          headers: { Authorization: `Bearer ${token}` },
         },
       }
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError) {
       console.error('User error:', userError);
