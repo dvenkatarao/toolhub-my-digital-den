@@ -42,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
+      console.log('Subscription check result:', data);
       setIsPremium(data?.subscribed || false);
       setSubscriptionEnd(data?.subscription_end || null);
     } catch (error) {

@@ -23,7 +23,10 @@ export default function Subscription() {
         title: "Subscription activated!",
         description: "Welcome to Personal Pro. Your premium features are now active.",
       });
-      checkSubscription();
+      // Delay subscription check to allow Stripe webhook to process
+      setTimeout(() => {
+        checkSubscription();
+      }, 2000);
       navigate('/dashboard/subscription', { replace: true });
     } else if (searchParams.get('canceled')) {
       toast({

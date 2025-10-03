@@ -15,6 +15,7 @@ import {
   CreditCard,
   ChevronDown,
   Star,
+  Clock,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -36,6 +37,7 @@ const quickTools = [
   { title: 'Link Shortener', url: '/dashboard/link-shortener', icon: Link2 },
   { title: 'Encrypted Text', url: '/dashboard/encrypted-text', icon: Shield },
   { title: 'Temporary Email', url: '/dashboard/temp-email', icon: Mail },
+  { title: 'Clocks & Timers', url: '/dashboard/clocks-timers', icon: Clock },
 ];
 
 const fileTools = [
@@ -51,7 +53,7 @@ const personalTools = [
 ];
 
 const calculators = [
-  { title: 'Mortgage Calculator', url: '/dashboard/mortgage-calculator', icon: Calculator },
+  { title: 'Calculators', url: '/dashboard/calculators', icon: Calculator },
 ];
 
 export function DashboardSidebar() {

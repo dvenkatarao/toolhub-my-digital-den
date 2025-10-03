@@ -57,7 +57,6 @@ const App = () => (
                 <Route path="personal-cloud" element={<ToolPlaceholder title="Personal Cloud" description="Your private cloud storage" icon={Cloud} />} />
                 <Route path="document-manager" element={<ToolPlaceholder title="Document Manager" description="Organize and manage documents" icon={FolderOpen} />} />
                 <Route path="photo-library" element={<ToolPlaceholder title="Photo Library" description="Store and organize your photos" icon={ImageIcon} />} />
-                <Route path="mortgage-calculator" element={<ToolPlaceholder title="Mortgage Calculator" description="Calculate mortgage payments and rates" icon={Calculator} />} />
                 <Route path="settings" element={<ToolPlaceholder title="Settings" description="Manage your account settings" icon={Settings} />} />
                 <Route path="subscription" element={<Subscription />} />
               </Route>
