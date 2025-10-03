@@ -28,44 +28,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkSubscription = async () => {
     if (!session) {
+      console.log('[AUTH] No session, setting premium to false');
       setIsPremium(false);
       setSubscriptionEnd(null);
       return;
     }
 
     try {
+      console.log('[AUTH] Checking subscription for user:', session.user.email);
       const { data, error } = await supabase.functions.invoke('check-subscription', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AUTH] Subscription check error:', error);
+        throw error;
+      }
 
-      console.log('Subscription check result:', data);
-      setIsPremium(data?.subscribed || false);
+      console.log('[AUTH] Subscription check result:', data);
+      const isSubscribed = data?.subscribed === true;
+      setIsPremium(isSubscribed);
       setSubscriptionEnd(data?.subscription_end || null);
+      console.log('[AUTH] Premium status updated to:', isSubscribed);
     } catch (error) {
-      console.error('Error checking subscription:', error);
-      setIsPremium(false);
-      setSubscriptionEnd(null);
+      console.error('[AUTH] Error checking subscription:', error);
+      // Don't reset premium status on error - keep current state
     }
   };
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, currentSession) => {
+        console.log('[AUTH] Auth state changed:', event, currentSession?.user?.email);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         setLoading(false);
         
-        // Check subscription status after auth change
-        if (session) {
-          setTimeout(() => {
-            checkSubscription();
-          }, 0);
+        // Check subscription status after auth change with a delay for session to stabilize
+        if (currentSession) {
+          setTimeout(async () => {
+            try {
+              console.log('[AUTH] Checking subscription after auth change');
+              const { data, error } = await supabase.functions.invoke('check-subscription', {
+                headers: {
+                  Authorization: `Bearer ${currentSession.access_token}`,
+                },
+              });
+
+              if (error) {
+                console.error('[AUTH] Subscription check error:', error);
+                return;
+              }
+
+              console.log('[AUTH] Subscription check result:', data);
+              const isSubscribed = data?.subscribed === true;
+              setIsPremium(isSubscribed);
+              setSubscriptionEnd(data?.subscription_end || null);
+              console.log('[AUTH] Premium status updated to:', isSubscribed);
+            } catch (error) {
+              console.error('[AUTH] Error checking subscription:', error);
+            }
+          }, 500);
         } else {
+          console.log('[AUTH] No session after auth change, clearing premium status');
           setIsPremium(false);
           setSubscriptionEnd(null);
         }
@@ -73,15 +101,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log('[AUTH] Initial session loaded:', initialSession?.user?.email);
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
       setLoading(false);
       
-      if (session) {
-        setTimeout(() => {
-          checkSubscription();
-        }, 0);
+      if (initialSession) {
+        setTimeout(async () => {
+          try {
+            console.log('[AUTH] Checking subscription on initial load');
+            const { data, error } = await supabase.functions.invoke('check-subscription', {
+              headers: {
+                Authorization: `Bearer ${initialSession.access_token}`,
+              },
+            });
+
+            if (error) {
+              console.error('[AUTH] Subscription check error:', error);
+              return;
+            }
+
+            console.log('[AUTH] Subscription check result:', data);
+            const isSubscribed = data?.subscribed === true;
+            setIsPremium(isSubscribed);
+            setSubscriptionEnd(data?.subscription_end || null);
+            console.log('[AUTH] Premium status updated to:', isSubscribed);
+          } catch (error) {
+            console.error('[AUTH] Error checking subscription:', error);
+          }
+        }, 500);
       }
     });
 
