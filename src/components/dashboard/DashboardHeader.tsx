@@ -1,5 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -10,12 +11,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Moon, Sun, LogOut, User, Settings } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Settings, Star } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Link } from 'react-router-dom';
 
 export function DashboardHeader() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isPremium } = useAuth();
   const { theme, setTheme } = useTheme();
 
   const getInitials = (email: string) => {
@@ -26,7 +27,11 @@ export function DashboardHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center gap-4 px-4">
         <SidebarTrigger />
-        
+        {isPremium && (
+          <Badge variant="secondary" className="ml-1 flex items-center gap-1">
+            <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" /> Pro
+          </Badge>
+        )}
         <div className="flex-1" />
 
         <Button

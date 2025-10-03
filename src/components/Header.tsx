@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Menu, X, Star } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";

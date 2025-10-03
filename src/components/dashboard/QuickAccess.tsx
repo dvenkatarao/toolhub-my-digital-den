@@ -1,15 +1,23 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Star, Link2, FileImage, Shield } from 'lucide-react';
+import { Star, Link2, FileImage, Shield, Lock, Cloud } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
-const favoriteTools = [
+const baseTools = [
   { name: 'Link Shortener', icon: Link2, url: '/dashboard/link-shortener', color: 'text-blue-500' },
   { name: 'Image Compressor', icon: FileImage, url: '/dashboard/image-compressor', color: 'text-green-500' },
   { name: 'Encrypted Text', icon: Shield, url: '/dashboard/encrypted-text', color: 'text-orange-500' },
 ];
 
+const premiumTools = [
+  { name: 'Password Manager', icon: Lock, url: '/dashboard/password-manager', color: 'text-purple-500' },
+  { name: 'Personal Cloud', icon: Cloud, url: '/dashboard/personal-cloud', color: 'text-cyan-500' },
+];
+
 export function QuickAccess() {
+  const { isPremium } = useAuth();
+  const tools = isPremium ? [...baseTools, ...premiumTools] : baseTools;
   return (
     <Card>
       <CardHeader>
@@ -21,7 +29,7 @@ export function QuickAccess() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-4">
-          {favoriteTools.map((tool) => (
+          {tools.map((tool) => (
             <Link
               key={tool.name}
               to={tool.url}

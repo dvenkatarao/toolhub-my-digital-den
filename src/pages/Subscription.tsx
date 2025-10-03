@@ -7,7 +7,7 @@ import { Check, Loader2, CreditCard, Calendar, Star } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
+import confetti from 'canvas-confetti';
 export default function Subscription() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -17,17 +17,32 @@ export default function Subscription() {
   const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
-    // Show success or canceled message
+    // Handle success/cancel from Stripe and refresh subscription status
     if (searchParams.get('success')) {
       toast({
         title: "Subscription activated!",
         description: "Welcome to Personal Pro. Your premium features are now active.",
       });
-      // Delay subscription check to allow Stripe webhook to process
-      setTimeout(() => {
-        checkSubscription();
+
+      let attempts = 0;
+      const iv = setInterval(async () => {
+        attempts++;
+        await checkSubscription();
+        if (isPremium) {
+          // Celebrate the upgrade
+          confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
+          confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } });
+          confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } });
+          clearInterval(iv);
+          navigate('/dashboard/subscription', { replace: true });
+        }
+        if (attempts >= 15) {
+          clearInterval(iv);
+          navigate('/dashboard/subscription', { replace: true });
+        }
       }, 2000);
-      navigate('/dashboard/subscription', { replace: true });
+
+      return () => clearInterval(iv);
     } else if (searchParams.get('canceled')) {
       toast({
         title: "Subscription canceled",
@@ -36,7 +51,7 @@ export default function Subscription() {
       });
       navigate('/dashboard/subscription', { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, isPremium]);
 
   const handleUpgrade = async () => {
     if (!session) return;
@@ -108,7 +123,14 @@ export default function Subscription() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Subscription</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Subscription</h1>
+          {isPremium && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" /> Pro
+            </Badge>
+          )}
+        </div>
         <p className="text-muted-foreground mt-2">
           Manage your subscription and billing
         </p>
@@ -160,7 +182,7 @@ export default function Subscription() {
                 <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
               </div>
               {isPremium && (
-                <Badge variant="secondary">Active</Badge>
+                <Badge variant="secondary">Current Plan</Badge>
               )}
             </div>
             <CardDescription>
