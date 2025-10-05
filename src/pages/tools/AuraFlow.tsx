@@ -1,12 +1,3 @@
-Of course. Here is the breathing exercise app converted into a self-contained TSX component, fitting perfectly into the provided template.
-
-This version encapsulates all the HTML, styling, and logic within a single React component. It uses `useState`, `useRef`, and `useEffect` to manage state and side effects, replacing the original's vanilla JavaScript DOM manipulation with the React paradigm.
-
-### `AuraFlowTool.tsx`
-
-Copy this code into a `.tsx` file in your React/Next.js project.
-
-```tsx
 'use client'; // Required for Next.js App Router to denote a client-side component
 
 import { Card, CardContent } from '@/components/ui/card';
