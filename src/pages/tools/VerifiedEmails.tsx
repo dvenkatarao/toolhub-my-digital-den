@@ -187,6 +187,7 @@ export default function VerifiedEmails() {
           description: "Please sign in to use this feature",
           variant: "destructive",
         });
+        setLoadingEmails(false);
         return;
       }
 
@@ -205,11 +206,24 @@ export default function VerifiedEmails() {
           description: data.error,
           variant: "destructive",
         });
+        setLoadingEmails(false);
         return;
       }
 
-      // Reload emails from database
-      await loadVerifiedEmails();
+      // Wait a moment for database to propagate updates
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Force reload from database
+      const { data: freshEmails, error: reloadError } = await supabase
+        .from('verified_destination_emails')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (reloadError) {
+        console.error('Reload error:', reloadError);
+      } else if (freshEmails) {
+        setEmails(freshEmails);
+      }
 
       toast({
         title: "Synced!",
