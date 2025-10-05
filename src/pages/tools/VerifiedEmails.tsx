@@ -35,12 +35,12 @@ export default function VerifiedEmails() {
   const loadVerifiedEmails = async () => {
     try {
       const { data, error } = await supabase
-        .from('verified_destination_emails' as any)
+        .from('verified_destination_emails')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setEmails((data as any) || []);
+      setEmails(data || []);
     } catch (error: any) {
       console.error('Error loading verified emails:', error);
       toast({
@@ -177,11 +177,54 @@ export default function VerifiedEmails() {
 
   const handleRefreshStatus = async () => {
     setLoadingEmails(true);
-    await loadVerifiedEmails();
-    toast({
-      title: "Refreshed",
-      description: "Email verification status updated",
-    });
+    
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!currentSession?.access_token) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to use this feature",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Call sync function
+      const { data, error } = await supabase.functions.invoke('sync-verified-emails', {
+        headers: {
+          Authorization: `Bearer ${currentSession.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        toast({
+          title: "Error",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Reload emails from database
+      await loadVerifiedEmails();
+
+      toast({
+        title: "Synced!",
+        description: data.message || "Email statuses updated",
+      });
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to sync email statuses",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingEmails(false);
+    }
   };
 
   return (
