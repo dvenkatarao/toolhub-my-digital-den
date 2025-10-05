@@ -1,4 +1,102 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Mail, Copy, RefreshCw, Trash2, Clock, AlertCircle, CheckCircle2, Loader2, Settings } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+
+interface TempEmailForward {
+  id: string;
+  temp_email_name: string;
+  destination_email: string;
+  created_at: string;
+  expires_at: string;
+  is_verified: boolean;
+  full_email?: string;
+}
+
+interface VerifiedEmail {
+  id: string;
+  email: string;
+  is_verified: boolean;
+}
+
+export default function TempEmail() {
+  const navigate = useNavigate();
+  const [tempEmailName, setTempEmailName] = useState('');
+  const [selectedDestination, setSelectedDestination] = useState('');
+  const [verifiedEmails, setVerifiedEmails] = useState<VerifiedEmail[]>([]);
+  const [forwards, setForwards] = useState<TempEmailForward[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingForwards, setLoadingForwards] = useState(true);
+  const [loadingVerifiedEmails, setLoadingVerifiedEmails] = useState(true);
+  const { toast } = useToast();
+  const { session, isPremium } = useAuth();
+
+  const domain = 'poofemail.com';
+
+  useEffect(() => {
+    if (session) {
+      loadVerifiedEmails();
+      loadForwards();
+      generateRandomName();
+    }
+  }, [session]);
+
+  const generateRandomName = () => {
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    setTempEmailName(result);
+  };
+
+  const loadVerifiedEmails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('verified_destination_emails')
+        .select('id, email, is_verified')
+        .eq('is_verified', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setVerifiedEmails(data || []);
+      
+      // Auto-select first verified email if available
+      if (data && data.length > 0 && !selectedDestination) {
+        setSelectedDestination(data[0].email);
+      }
+    } catch (error: any) {
+      console.error('Error loading verified emails:', error);
+    } finally {
+      setLoadingVerifiedEmails(false);
+    }
+  };
+
+  const loadForwards = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('temp_email_forwards')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const forwardsWithFullEmail = data.map(forward => ({
+        ...forward,
+        full
+
+/*          
+
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -458,6 +556,7 @@ export default function TempEmail() {
     </div>
   );
 }
+*/
 /*
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
