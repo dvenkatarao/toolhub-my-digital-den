@@ -15,10 +15,11 @@ serve(async (req)=>{
     // Use service role key for admin operations
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     // Also get user context
+    const authHeader = req.headers.get('Authorization')
     const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
       global: {
         headers: {
-          Authorization: req.headers.get('Authorization')
+          Authorization: authHeader ?? ''
         }
       }
     });
@@ -73,7 +74,7 @@ serve(async (req)=>{
     // Create a map of Cloudflare email statuses
     const cloudflareEmails = new Map();
     if (cloudflareData.result && Array.isArray(cloudflareData.result)) {
-      cloudflareData.result.forEach((email)=>{
+      cloudflareData.result.forEach((email: any)=>{
         console.log(`Cloudflare email: ${email.email}, ID: ${email.id}, Verified: ${email.verified}`);
         cloudflareEmails.set(email.id, {
           verified: email.verified || false,
@@ -139,10 +140,12 @@ serve(async (req)=>{
       }
     });
   } catch (error) {
-    console.error('Sync error:', error);
+    console.error('Sync error:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return new Response(JSON.stringify({
-      error: error.message,
-      stack: error.stack
+      error: error instanceof Error ? error.message : 'Service temporarily unavailable'
     }), {
       status: 500,
       headers: {

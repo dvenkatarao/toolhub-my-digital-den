@@ -45,9 +45,11 @@ serve(async (req) => {
       )
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    // Validate and normalize email format (enhanced validation)
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    const normalizedEmail = email.toLowerCase().trim()
+    
+    if (!emailRegex.test(normalizedEmail) || normalizedEmail.length > 254) {
       return new Response(
         JSON.stringify({ error: 'Invalid email format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -59,7 +61,7 @@ serve(async (req) => {
       .from('verified_destination_emails')
       .select('id')
       .eq('user_id', user.id)
-      .eq('email', email)
+      .eq('email', normalizedEmail)
       .single()
 
     if (existing) {
@@ -81,7 +83,7 @@ serve(async (req) => {
           'Authorization': `Bearer ${cloudflareApiToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: normalizedEmail }),
       }
     )
 
@@ -102,7 +104,7 @@ serve(async (req) => {
           }
         )
         const listData = await listResponse.json()
-        const existingEmail = listData.result?.find((e: any) => e.email === email)
+        const existingEmail = listData.result?.find((e: any) => e.email === normalizedEmail)
         
         if (existingEmail) {
           // Insert into our database with existing Cloudflare ID
@@ -110,7 +112,7 @@ serve(async (req) => {
             .from('verified_destination_emails')
             .insert({
               user_id: user.id,
-              email: email,
+              email: normalizedEmail,
               cloudflare_email_id: existingEmail.id,
               is_verified: existingEmail.verified || false,
             })
@@ -131,7 +133,7 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ error: 'Failed to add email to Cloudflare', details: cloudflareData.errors }),
+        JSON.stringify({ error: 'Failed to configure email routing. Please try again.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -144,7 +146,7 @@ serve(async (req) => {
       .from('verified_destination_emails')
       .insert({
         user_id: user.id,
-        email: email,
+        email: normalizedEmail,
         cloudflare_email_id: cloudflareEmailId,
         is_verified: isVerified,
       })
@@ -174,10 +176,23 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error adding verified email:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    
+    // Map specific errors to user-friendly messages
+    let userMessage = 'Service temporarily unavailable. Please try again later.'
+    let statusCode = 500
+    
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+      userMessage = 'This email is already added.'
+      statusCode = 409
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: userMessage }),
+      { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

@@ -46,20 +46,22 @@ serve(async (req) => {
       )
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(destinationEmail)) {
+    // Validate and normalize email format (enhanced validation)
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    const normalizedEmail = destinationEmail.toLowerCase().trim()
+    
+    if (!emailRegex.test(normalizedEmail) || normalizedEmail.length > 254) {
       return new Response(
-        JSON.stringify({ error: 'Invalid destination email format' }),
+        JSON.stringify({ error: 'Invalid email format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Validate temp email name (alphanumeric and hyphens only)
+    // Validate temp email name (alphanumeric and hyphens only, max 63 chars)
     const nameRegex = /^[a-z0-9-]+$/
-    if (!nameRegex.test(tempEmailName)) {
+    if (!nameRegex.test(tempEmailName) || tempEmailName.length > 63 || tempEmailName.length < 3) {
       return new Response(
-        JSON.stringify({ error: 'Temp email name can only contain lowercase letters, numbers, and hyphens' }),
+        JSON.stringify({ error: 'Temp email name must be 3-63 characters: lowercase letters, numbers, and hyphens only' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -134,7 +136,7 @@ serve(async (req) => {
     if (!cloudflareData.success) {
       console.error('Cloudflare API error:', cloudflareData)
       return new Response(
-        JSON.stringify({ error: 'Failed to create email routing rule', details: cloudflareData.errors }),
+        JSON.stringify({ error: 'Failed to configure email routing. Please try again.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -147,7 +149,7 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         temp_email_name: tempEmailName,
-        destination_email: destinationEmail,
+        destination_email: normalizedEmail,
         cloudflare_rule_id: cloudflareRuleId,
         verification_token: verificationToken,
         is_verified: false, // Will be verified via email
@@ -170,12 +172,10 @@ serve(async (req) => {
       throw insertError
     }
 
-    // Send verification email (you'll need to implement this)
-    // For now, we'll mark it as verified (remove this in production)
-    await supabaseClient
-      .from('temp_email_forwards')
-      .update({ is_verified: true })
-      .eq('id', forward.id)
+    // SECURITY FIX: Removed auto-verification
+    // TODO: Implement proper email verification flow before enabling forwarding
+    // Forwards will remain unverified until proper verification is implemented
+    console.log('Forward created (unverified):', forward.id)
 
     return new Response(
       JSON.stringify({
@@ -188,10 +188,23 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error creating temp email:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+    
+    // Map specific errors to user-friendly messages
+    let userMessage = 'Service temporarily unavailable. Please try again later.'
+    let statusCode = 500
+    
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+      userMessage = 'This email name is already taken.'
+      statusCode = 409
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: userMessage }),
+      { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

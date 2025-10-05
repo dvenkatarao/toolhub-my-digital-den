@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     if (!YOURLS_SIGNATURE) {
       console.error('YOURLS_API_SIGNATURE is not configured');
       return new Response(
-        JSON.stringify({ error: 'Server misconfiguration', details: 'YOURLS_API_SIGNATURE not set' }),
+        JSON.stringify({ error: 'Service temporarily unavailable. Please try again later.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -87,9 +87,9 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError) {
-      console.error('User error:', userError);
+      console.error('User authentication error:', userError);
       return new Response(
-        JSON.stringify({ error: 'Authentication failed', details: userError.message }),
+        JSON.stringify({ error: 'Authentication failed. Please try again.' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -101,18 +101,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get user's plan
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('plan')
+    // Check premium status via user_subscriptions table (secure)
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('user_subscriptions')
+      .select('status, plan_type, current_period_end')
       .eq('user_id', user.id)
+      .eq('status', 'active')
+      .gte('current_period_end', new Date().toISOString())
       .maybeSingle();
 
-    if (profileError) {
-      console.error('Profile fetch error:', profileError);
+    if (subscriptionError) {
+      console.error('Subscription fetch error:', subscriptionError);
     }
 
-    const isPremium = profile?.plan === 'PREMIUM';
+    const isPremium = subscription?.plan_type === 'premium';
 
     const { action, url, keyword, title, stats } = await req.json();
 
@@ -188,10 +190,12 @@ Deno.serve(async (req) => {
         );
     }
   } catch (error) {
-    console.error('Error in yourls function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Error in yourls function:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'Service temporarily unavailable. Please try again later.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

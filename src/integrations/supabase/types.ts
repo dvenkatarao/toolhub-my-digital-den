@@ -47,12 +47,144 @@ export type Database = {
         }
         Relationships: []
       }
+      temp_email_forwards: {
+        Row: {
+          cloudflare_rule_id: string | null
+          created_at: string | null
+          destination_email: string
+          expires_at: string | null
+          id: string
+          is_verified: boolean | null
+          temp_email_name: string
+          user_id: string
+          verification_token: string | null
+        }
+        Insert: {
+          cloudflare_rule_id?: string | null
+          created_at?: string | null
+          destination_email: string
+          expires_at?: string | null
+          id?: string
+          is_verified?: boolean | null
+          temp_email_name: string
+          user_id: string
+          verification_token?: string | null
+        }
+        Update: {
+          cloudflare_rule_id?: string | null
+          created_at?: string | null
+          destination_email?: string
+          expires_at?: string | null
+          id?: string
+          is_verified?: boolean | null
+          temp_email_name?: string
+          user_id?: string
+          verification_token?: string | null
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_type: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_type: string
+          status: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_type?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      verified_destination_emails: {
+        Row: {
+          cloudflare_email_id: string
+          created_at: string | null
+          email: string
+          id: string
+          is_verified: boolean | null
+          user_id: string
+        }
+        Insert: {
+          cloudflare_email_id: string
+          created_at?: string | null
+          email: string
+          id?: string
+          is_verified?: boolean | null
+          user_id: string
+        }
+        Update: {
+          cloudflare_email_id?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_verified?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_user_premium: {
+        Args: { user_uuid: string }
+        Returns: boolean
+      }
+      delete_forward_record: {
+        Args: { forward_id: string }
+        Returns: undefined
+      }
+      get_expired_forwards: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          cloudflare_rule_id: string
+          id: string
+          temp_email_name: string
+        }[]
+      }
+      get_total_active_forwards: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_user_verified_emails: {
+        Args: { user_uuid: string }
+        Returns: {
+          email: string
+          id: string
+          is_verified: boolean
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
