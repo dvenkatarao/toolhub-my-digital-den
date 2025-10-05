@@ -78,12 +78,14 @@ serve(async (req) => {
 
     // Create a map of Cloudflare email statuses
     const cloudflareEmails = new Map()
-    cloudflareData.result.forEach((email: any) => {
-      cloudflareEmails.set(email.id, {
-        verified: email.verified || false,
-        email: email.email
+    if (cloudflareData.result && Array.isArray(cloudflareData.result)) {
+      cloudflareData.result.forEach((email: any) => {
+        cloudflareEmails.set(email.id, {
+          verified: email.verified || false,
+          email: email.email
+        })
       })
-    })
+    }
 
     // Update each user email with Cloudflare status
     let updatedCount = 0
@@ -117,11 +119,11 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
-    console.error('Error:', error)
+  } catch (error: any) {
+    console.error('Sync error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
-});
+})
