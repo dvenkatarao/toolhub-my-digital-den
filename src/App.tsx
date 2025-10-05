@@ -18,7 +18,7 @@ import EncryptedText from "./pages/tools/EncryptedText";
 import TempEmail from "./pages/tools/TempEmail";
 import VerifiedEmails from "./pages/tools/VerifiedEmails";
 import Calculators from "./pages/tools/Calculators";
-import ClocksTimers from "./pages/tools/ClocksTimers";
+import ClocksTimers from "./pages/tools/ClocksTimer";
 import ToolPlaceholder from "./pages/tools/ToolPlaceholder";
 import { Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings, Clock } from "lucide-react";
 import Subscription from "./pages/Subscription";

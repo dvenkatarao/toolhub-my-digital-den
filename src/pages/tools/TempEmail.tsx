@@ -61,17 +61,17 @@ export default function TempEmail() {
   const loadVerifiedEmails = async () => {
     try {
       const { data, error } = await supabase
-        .from('verified_destination_emails')
+        .from('verified_destination_emails' as any)
         .select('id, email, is_verified')
         .eq('is_verified', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setVerifiedEmails(data || []);
+      setVerifiedEmails((data as any) || []);
       
       // Auto-select first verified email if available
       if (data && data.length > 0 && !selectedDestination) {
-        setSelectedDestination(data[0].email);
+        setSelectedDestination((data as any)[0].email);
       }
     } catch (error: any) {
       console.error('Error loading verified emails:', error);
@@ -83,13 +83,13 @@ export default function TempEmail() {
   const loadForwards = async () => {
     try {
       const { data, error } = await supabase
-        .from('temp_email_forwards')
+        .from('temp_email_forwards' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const forwardsWithFullEmail = data.map(forward => ({
+      const forwardsWithFullEmail = (data as any[]).map((forward: any) => ({
         ...forward,
         full_email: `${forward.temp_email_name}@${domain}`
       }));

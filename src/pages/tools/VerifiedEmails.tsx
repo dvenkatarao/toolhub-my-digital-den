@@ -35,12 +35,12 @@ export default function VerifiedEmails() {
   const loadVerifiedEmails = async () => {
     try {
       const { data, error } = await supabase
-        .from('verified_destination_emails')
+        .from('verified_destination_emails' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setEmails(data || []);
+      setEmails((data as any) || []);
     } catch (error: any) {
       console.error('Error loading verified emails:', error);
       toast({
