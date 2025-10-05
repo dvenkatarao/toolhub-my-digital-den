@@ -210,19 +210,23 @@ export default function VerifiedEmails() {
         return;
       }
 
-      // Wait a moment for database to propagate updates
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Force reload from database
-      const { data: freshEmails, error: reloadError } = await supabase
-        .from('verified_destination_emails')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use the emails returned directly from the sync function
+      // This bypasses any database read lag issues
+      if (data.emails && Array.isArray(data.emails)) {
+        setEmails(data.emails);
+        console.log('Updated emails from sync response:', data.emails);
+      } else {
+        // Fallback: query database if emails not in response
+        const { data: freshEmails, error: reloadError } = await supabase
+          .from('verified_destination_emails')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (reloadError) {
-        console.error('Reload error:', reloadError);
-      } else if (freshEmails) {
-        setEmails(freshEmails);
+        if (reloadError) {
+          console.error('Reload error:', reloadError);
+        } else if (freshEmails) {
+          setEmails(freshEmails);
+        }
       }
 
       toast({
@@ -329,7 +333,7 @@ export default function VerifiedEmails() {
               onClick={handleRefreshStatus}
               disabled={loadingEmails}
             >
-              <Mail className={`h-4 w-4 ${loadingEmails ? 'animate-pulse' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${loadingEmails ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </CardHeader>
