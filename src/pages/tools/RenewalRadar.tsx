@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import type { SubscriptionItem } from '@/workers/renewal-radar.worker';
-import MyWorker from '../workers/renewal-radar.worker.ts?worker'; // 1. Add this import at the top
 import RenewalRadarWorker from '../workers/renewal-radar.worker.ts?worker';
 
 
