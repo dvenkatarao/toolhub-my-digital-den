@@ -16,4 +16,7 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom"],
   },
+    worker: {
+    format: "es",
+  },
 }));
