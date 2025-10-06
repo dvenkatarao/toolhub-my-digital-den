@@ -22,6 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import type { SubscriptionItem } from '@/workers/renewal-radar.worker';
 import MyWorker from '../workers/renewal-radar.worker.ts?worker'; // 1. Add this import at the top
+import RenewalRadarWorker from '../workers/renewal-radar.worker.ts?worker';
+
 
 const RenewalRadar = () => {
   const [processLocally, setProcessLocally] = useState(true);
@@ -29,12 +31,12 @@ const RenewalRadar = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const workerRef = useRef<Worker | null>(null);
+  const workerRef = useRef<Worker>();
   const { toast } = useToast();
 
   const initWorker = useCallback(() => {
     if (!workerRef.current) {
-      workerRef.current = new MyWorker();
+      workerRef.current = new RenewalRadarWorker();
 
       workerRef.current.onmessage = (e: MessageEvent) => {
         const { subscriptions: newSubs } = e.data;
