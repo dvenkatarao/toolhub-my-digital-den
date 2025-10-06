@@ -263,30 +263,30 @@ export default function AuraFlowTool() {
   return (
     <>
       <style>{`
-        /* --- This CSS is directly ported from the original HTML file --- */
-        :root{
-          --bg: #0d1117; --panel: #161b22; --text: #e6edf3; --muted: #8b949e;
-          --ring-track: rgba(230, 237, 243, 0.1); --outline: rgba(230, 237, 243, 0.12);
-          --inhale: #2dd4bf; --exhale: #a78bfa; --hold: #f59e0b;
+        /* AuraFlow styles integrated with ToolHub design system */
+        .auraflow-container {
+          --inhale: hsl(174, 72%, 56%);
+          --exhale: hsl(258, 90%, 66%);
+          --hold: hsl(38, 92%, 50%);
         }
         .auraflow-container * { box-sizing: border-box; }
-        .auraflow-container { max-width: 960px; margin: 0 auto; color: var(--text); }
+        .auraflow-container { max-width: 960px; margin: 0 auto; color: hsl(var(--foreground)); }
         .auraflow-header{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
         .auraflow-stage{ display: grid; grid-template-columns: 1fr; gap: 18px; align-items: center; justify-items: center; margin-top: 10px; margin-bottom: 24px; }
         .auraflow-ring{
           --deg: 0deg; --accent: var(--inhale);
           width: min(80vw, 380px); aspect-ratio: 1/1; border-radius: 50%; position: relative;
-          background: conic-gradient(var(--accent) var(--deg), var(--ring-track) var(--deg) 360deg);
-          box-shadow: inset 0 0 0 1px var(--outline), 0 10px 40px rgba(0, 0, 0, 0.3);
+          background: conic-gradient(var(--accent) var(--deg), hsl(var(--muted) / 0.1) var(--deg) 360deg);
+          box-shadow: inset 0 0 0 1px hsl(var(--border)), var(--shadow-elegant);
           display: grid; place-items: center; transition: background 0.4s ease;
         }
         .auraflow-orb{
           --phase-seconds: 4; --scale: 0.85;
           width: 82%; height: 82%; border-radius: 50%;
-          background: radial-gradient(100% 100% at 30% 30%, rgba(255,255,255,0.12), transparent 70%),
-                      radial-gradient(100% 100% at 70% 70%, rgba(255,255,255,0.1), transparent 60%),
-                      var(--panel);
-          box-shadow: inset 0 0 60px rgba(255,255,255,0.05), 0 12px 50px rgba(0,0,0,0.2);
+          background: radial-gradient(100% 100% at 30% 30%, hsl(var(--foreground) / 0.08), transparent 70%),
+                      radial-gradient(100% 100% at 70% 70%, hsl(var(--foreground) / 0.06), transparent 60%),
+                      hsl(var(--card));
+          box-shadow: inset 0 0 60px hsl(var(--foreground) / 0.03), var(--shadow-primary);
           display: grid; place-items: center; transform: scale(var(--scale));
           transition: transform calc(var(--phase-seconds) * 1s) cubic-bezier(0.65, 0, 0.35, 1), background 0.4s ease;
           position: relative; overflow: hidden;
@@ -294,64 +294,71 @@ export default function AuraFlowTool() {
         .auraflow-orb-content{ text-align: center; }
         .auraflow-orb .phase{
           font-size: clamp(16px, 2.4vw, 20px); letter-spacing: 0.5px;
-          text-transform: uppercase; font-weight: 600; color: #d0d8e2;
+          text-transform: uppercase; font-weight: 600; color: hsl(var(--muted-foreground));
         }
         .auraflow-orb .countdown{
           font-variant-numeric: tabular-nums; font-size: clamp(34px, 6.2vw, 52px);
           font-weight: 700; line-height: 1.1; margin-top: 2px;
-          text-shadow: 0 1px 0 rgba(0,0,0,0.2);
+          color: hsl(var(--foreground));
         }
         .auraflow-controls{ width: 100%; display: grid; grid-template-columns: 1fr; gap: 16px; }
-        .auraflow-panel{ background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-          border: 1px solid var(--outline); border-radius: 16px; padding: 16px;
+        .auraflow-panel{ 
+          background: hsl(var(--card));
+          border: 1px solid hsl(var(--border)); border-radius: 16px; padding: 16px;
         }
         .auraflow-actions{ display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
         .auraflow-btn{
-          appearance: none; border: 1px solid var(--outline); font-family: inherit;
-          background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-          color: var(--text); font-size: 15px; border-radius: 10px; padding: 12px 18px;
+          appearance: none; border: 1px solid hsl(var(--border)); font-family: inherit;
+          background: hsl(var(--secondary));
+          color: hsl(var(--foreground)); font-size: 15px; border-radius: 10px; padding: 12px 18px;
           font-weight: 600; letter-spacing: 0.2px;
-          cursor: pointer; transition: transform 0.1s ease, background 0.2s ease, border-color 0.2s;
+          cursor: pointer; transition: var(--transition-smooth);
         }
         .auraflow-btn:disabled{ opacity: 0.5; cursor: not-allowed; }
         .auraflow-btn.primary{
-          border-color: rgba(45,212,191,0.6);
-          background: linear-gradient(180deg, rgba(45,212,191,0.25), rgba(45,212,191,0.15));
-          box-shadow: 0 6px 24px rgba(45,212,191,0.25);
+          border-color: hsl(var(--primary));
+          background: var(--gradient-primary);
+          color: hsl(var(--primary-foreground));
+          box-shadow: var(--shadow-primary);
         }
-        .auraflow-btn:hover:not(:disabled){ transform: translateY(-1px); }
+        .auraflow-btn:hover:not(:disabled){ transform: translateY(-1px); opacity: 0.9; }
         .auraflow-segmented{ display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
         .auraflow-segmented button{
-          appearance: none; border: 1px solid var(--outline); font-family: inherit;
-          background: transparent; color: var(--muted); font-size: 13px;
+          appearance: none; border: 1px solid hsl(var(--border)); font-family: inherit;
+          background: transparent; color: hsl(var(--muted-foreground)); font-size: 13px;
           border-radius: 8px; padding: 8px 12px;
           cursor: pointer; font-weight: 600;
-          transition: background 0.2s, color 0.2s, border-color 0.2s;
+          transition: var(--transition-smooth);
         }
-        .auraflow-segmented button[aria-checked="true"]{ background: rgba(255,255,255,0.07); }
+        .auraflow-segmented button[aria-checked="true"]{ background: hsl(var(--accent) / 0.1); }
         .auraflow-segmented button[data-target="inhale"][aria-checked="true"]{ color: var(--inhale); border-color: var(--inhale); }
         .auraflow-segmented button[data-target="holdIn"][aria-checked="true"]{ color: var(--hold); border-color: var(--hold); }
         .auraflow-segmented button[data-target="exhale"][aria-checked="true"]{ color: var(--exhale); border-color: var(--exhale); }
         .auraflow-segmented button[data-target="holdOut"][aria-checked="true"]{ color: var(--hold); border-color: var(--hold); }
         .auraflow-slider{ display: grid; gap: 8px; margin-top: 14px; }
-        .auraflow-slider label{ font-weight: 600; color: #dbe9ff; display: flex; justify-content: space-between; }
+        .auraflow-slider label{ font-weight: 600; color: hsl(var(--foreground)); display: flex; justify-content: space-between; }
         .auraflow-slider input[type="range"]{
-          --track-bg: linear-gradient(90deg, var(--inhale), var(--hold), var(--exhale));
+          --track-bg: var(--gradient-hero);
           width: 100%; appearance: none; height: 8px; border-radius: 999px;
           background: var(--track-bg);
-          outline: none; border: 1px solid var(--outline);
+          outline: none; border: 1px solid hsl(var(--border));
         }
         .auraflow-slider input[type="range"]::-webkit-slider-thumb{
           -webkit-appearance: none; appearance: none;
           width: 24px; height: 24px; border-radius: 50%;
-          background: #fff; border: 2px solid rgba(255,255,255,0.7);
-          box-shadow: 0 4px 14px rgba(0,0,0,0.3); cursor: pointer;
+          background: hsl(var(--primary)); border: 2px solid hsl(var(--primary-foreground));
+          box-shadow: var(--shadow-primary); cursor: pointer;
+        }
+        .auraflow-slider input[type="range"]::-moz-range-thumb{
+          width: 24px; height: 24px; border-radius: 50%;
+          background: hsl(var(--primary)); border: 2px solid hsl(var(--primary-foreground));
+          box-shadow: var(--shadow-primary); cursor: pointer;
         }
         .auraflow-chips{ display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
         .auraflow-chip{
-          border: 1px solid var(--outline); border-radius: 999px; padding: 6px 12px;
-          font-weight: 600; color: #cfe3ff; font-size: 13px;
-          background: rgba(255,255,255,0.02);
+          border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 6px 12px;
+          font-weight: 600; color: hsl(var(--foreground)); font-size: 13px;
+          background: hsl(var(--muted) / 0.3);
           display: inline-flex; align-items: center; gap: 6px;
         }
         .auraflow-chip::before{ content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
@@ -360,12 +367,12 @@ export default function AuraFlowTool() {
         .auraflow-toggles{ display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: center; }
         .auraflow-toggle{
           display: inline-flex; align-items: center; gap: 8px; font-weight: 600;
-          border: 1px solid var(--outline); border-radius: 999px; padding: 6px 10px;
-          background: rgba(255,255,255,0.02); cursor: pointer;
+          border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 6px 10px;
+          background: hsl(var(--muted) / 0.2); cursor: pointer; color: hsl(var(--foreground));
         }
-        .auraflow-toggle input{ accent-color: #62f0d6; transform: scale(1.1); }
+        .auraflow-toggle input{ accent-color: hsl(var(--primary)); transform: scale(1.1); }
         .auraflow-footer{ margin-top: 24px; text-align: center; }
-        .auraflow-muted { color: var(--muted); }
+        .auraflow-muted { color: hsl(var(--muted-foreground)); }
       `}</style>
       <div className="space-y-6">
         <div>
@@ -458,4 +465,3 @@ export default function AuraFlowTool() {
     </>
   );
 }
-```

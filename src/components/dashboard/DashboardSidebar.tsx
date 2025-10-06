@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Star,
   Clock,
+  Waves,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -38,6 +39,7 @@ const quickTools = [
   { title: 'Encrypted Text', url: '/dashboard/encrypted-text', icon: Shield },
   { title: 'Temporary Email', url: '/dashboard/temp-email', icon: Mail },
   { title: 'Clocks & Timers', url: '/dashboard/clocks-timers', icon: Clock },
+  { title: 'AuraFlow Breathing', url: '/dashboard/auraflow', icon: Waves },
 ];
 
 const fileTools = [
