@@ -1,14 +1,6 @@
 import PostalMime from 'postal-mime';
 
-export type SubscriptionItem = {
-  id: string;
-  vendor: string;
-  amount?: number;
-  currency?: string;
-  nextChargeDate?: string;
-  status: 'active' | 'trial';
-  rawSubject?: string;
-};
+import type { SubscriptionItem, WorkerRequest, WorkerResponse } from '@/types/renewal-radar';
 
 const SUBSCRIPTION_KEYWORDS = [
   'subscription', 'auto-renew', 'trial ends', 'invoice', 'receipt',
@@ -126,7 +118,7 @@ async function parseEmailFile(file: File): Promise<SubscriptionItem | null> {
   }
 }
 
-self.onmessage = async (e: MessageEvent) => {
+self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const files: File[] = e.data.files;
   const results: SubscriptionItem[] = [];
 
@@ -137,5 +129,6 @@ self.onmessage = async (e: MessageEvent) => {
     }
   }
 
-  self.postMessage({ subscriptions: results });
+  const response: WorkerResponse = { subscriptions: results };
+  self.postMessage(response);
 };
