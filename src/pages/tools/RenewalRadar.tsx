@@ -20,8 +20,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import type { SubscriptionItem } from '@/workers/renewal-radar.worker';
-import RenewalRadarWorker from '../workers/renewal-radar.worker.ts?worker';
+import RenewalRadarWorker from '@/workers/renewal-radar.worker.ts?worker';
+import type { SubscriptionItem, WorkerResponse } from '@/types/renewal-radar';
 
 
 const RenewalRadar = () => {
@@ -37,8 +37,10 @@ const RenewalRadar = () => {
     if (!workerRef.current) {
       workerRef.current = new RenewalRadarWorker();
 
-      workerRef.current.onmessage = (e: MessageEvent) => {
+      workerRef.current.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const { subscriptions: newSubs } = e.data;
+      //workerRef.current.onmessage = (e: MessageEvent) => {
+      //  const { subscriptions: newSubs } = e.data;
         setSubscriptions(prev => {
           const combined = [...prev, ...newSubs];
           const unique = Array.from(
