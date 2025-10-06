@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import type { SubscriptionItem } from '@/workers/renewal-radar.worker';
+import MyWorker from '../workers/renewal-radar.worker.ts?worker'; // 1. Add this import at the top
 
 const RenewalRadar = () => {
   const [processLocally, setProcessLocally] = useState(true);
@@ -33,10 +34,7 @@ const RenewalRadar = () => {
 
   const initWorker = useCallback(() => {
     if (!workerRef.current) {
-      workerRef.current = new Worker(
-        new URL('../workers/renewal-radar.worker.ts', import.meta.url),
-        { type: 'module' }
-      );
+      workerRef.current = new MyWorker();
 
       workerRef.current.onmessage = (e: MessageEvent) => {
         const { subscriptions: newSubs } = e.data;
