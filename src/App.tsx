@@ -21,7 +21,7 @@ import Calculators from "./pages/tools/Calculators";
 import ClocksTimers from "./pages/tools/ClocksTimer";
 import AuraFlow from "./pages/tools/AuraFlow";
 import RenewalRadar from "./pages/tools/RenewalRadar";
-import FileStorage from "./pages/tools/FileStorage";
+//import FileStorage from "./pages/tools/FileStorage";
 import ToolPlaceholder from "./pages/tools/ToolPlaceholder";
 import { Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings, Clock, Wallet } from "lucide-react";
 import Subscription from "./pages/Subscription";
@@ -58,7 +58,6 @@ const App = () => (
                 <Route path="clocks-timers" element={<ClocksTimers />} />
                 <Route path="auraflow" element={<AuraFlow />} />
                 <Route path="renewal-radar" element={<RenewalRadar />} />
-                <route path="file-storage" element-{<FileStorage/>} />
                 <Route path="image-compressor" element={<ToolPlaceholder title="Image Compressor" description="Compress images without losing quality" icon={FileImage} />} />
                 <Route path="pdf-converter" element={<ToolPlaceholder title="PDF Converter" description="Convert files to and from PDF" icon={FileText} />} />
                 <Route path="password-manager" element={<ToolPlaceholder title="Password Manager" description="Securely store and manage passwords" icon={Lock} />} />
