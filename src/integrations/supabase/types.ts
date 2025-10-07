@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      files: {
+        Row: {
+          created_at: string | null
+          folder: string | null
+          id: string
+          is_favorite: boolean | null
+          name: string
+          size: number
+          storage_path: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          folder?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name: string
+          size: number
+          storage_path: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          folder?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name?: string
+          size?: number
+          storage_path?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -44,6 +83,177 @@ export type Database = {
           updated_at?: string
           usage?: Json | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      reminder_emails: {
+        Row: {
+          id: string
+          next_reminder_at: string | null
+          reminder_type: string | null
+          sent_at: string | null
+          subscription_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          next_reminder_at?: string | null
+          reminder_type?: string | null
+          sent_at?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          next_reminder_at?: string | null
+          reminder_type?: string | null
+          sent_at?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_emails_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shared_files: {
+        Row: {
+          created_at: string | null
+          file_id: string
+          id: string
+          owner_id: string
+          permission: string
+          shared_with_email: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_id: string
+          id?: string
+          owner_id: string
+          permission: string
+          shared_with_email: string
+        }
+        Update: {
+          created_at?: string | null
+          file_id?: string
+          id?: string
+          owner_id?: string
+          permission?: string
+          shared_with_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_files_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_usage: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_used_date: string | null
+          subscription_id: string | null
+          updated_at: string | null
+          usage_count: number | null
+          usage_notes: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_used_date?: string | null
+          subscription_id?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+          usage_notes?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_used_date?: string | null
+          subscription_id?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+          usage_notes?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_usage_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          amount: number | null
+          billing_cycle: string | null
+          category: string | null
+          created_at: string | null
+          currency: string | null
+          deleted_at: string | null
+          id: string
+          last_billing_date: string | null
+          next_billing_date: string | null
+          notes: string | null
+          original_email_date: string | null
+          raw_email_body: string | null
+          raw_email_subject: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          vendor: string
+        }
+        Insert: {
+          amount?: number | null
+          billing_cycle?: string | null
+          category?: string | null
+          created_at?: string | null
+          currency?: string | null
+          deleted_at?: string | null
+          id?: string
+          last_billing_date?: string | null
+          next_billing_date?: string | null
+          notes?: string | null
+          original_email_date?: string | null
+          raw_email_body?: string | null
+          raw_email_subject?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          vendor: string
+        }
+        Update: {
+          amount?: number | null
+          billing_cycle?: string | null
+          category?: string | null
+          created_at?: string | null
+          currency?: string | null
+          deleted_at?: string | null
+          id?: string
+          last_billing_date?: string | null
+          next_billing_date?: string | null
+          notes?: string | null
+          original_email_date?: string | null
+          raw_email_body?: string | null
+          raw_email_subject?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          vendor?: string
         }
         Relationships: []
       }
@@ -80,6 +290,39 @@ export type Database = {
           temp_email_name?: string
           user_id?: string
           verification_token?: string | null
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string | null
+          enable_monthly_stats: boolean | null
+          enable_usage_reminders: boolean | null
+          enable_weekly_summary: boolean | null
+          notification_email: string | null
+          reminder_days_before: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          enable_monthly_stats?: boolean | null
+          enable_usage_reminders?: boolean | null
+          enable_weekly_summary?: boolean | null
+          notification_email?: string | null
+          reminder_days_before?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          enable_monthly_stats?: boolean | null
+          enable_usage_reminders?: boolean | null
+          enable_weekly_summary?: boolean | null
+          notification_email?: string | null
+          reminder_days_before?: number | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -125,6 +368,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_tracking_emails: {
+        Row: {
+          created_at: string | null
+          id: string
+          tracking_email: string
+          user_id: string | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          tracking_email: string
+          user_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          tracking_email?: string
+          user_id?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
       verified_destination_emails: {
         Row: {
           cloudflare_email_id: string
@@ -154,7 +421,18 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      subscription_stats: {
+        Row: {
+          active_count: number | null
+          categories: string[] | null
+          monthly_spend: number | null
+          total_subscriptions: number | null
+          trial_count: number | null
+          user_id: string | null
+          yearly_spend: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_user_premium: {
