@@ -17,6 +17,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown, Mail } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -188,6 +194,39 @@ const handleFiles = useCallback((files: FileList) => {
         </div>
       </div>
 
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <span className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              How to export your emails
+            </span>
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4 space-y-4">
+          <Card className="p-4">
+            <h3 className="font-semibold mb-2">Gmail (Google Takeout)</h3>
+            <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>Go to <a href="https://takeout.google.com" target="_blank" rel="noopener" className="text-primary hover:underline">takeout.google.com</a></li>
+              <li>Deselect all, then select only "Mail"</li>
+              <li>Click "All Mail data included" and select specific labels (e.g., "Receipts", "Subscriptions")</li>
+              <li>Choose "Export once" and .zip format</li>
+              <li>Download and extract the .mbox file, then upload it here</li>
+            </ol>
+          </Card>
+          <Card className="p-4">
+            <h3 className="font-semibold mb-2">Outlook / Outlook.com</h3>
+            <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>In Outlook, select the folder you want to export</li>
+              <li>Go to File → Open & Export → Import/Export</li>
+              <li>Choose "Export to a file" → "Outlook Data File (.pst)"</li>
+              <li>Convert .pst to .mbox using a tool like <a href="https://www.pst-to-mbox.com/" target="_blank" rel="noopener" className="text-primary hover:underline">pst-to-mbox</a></li>
+              <li>Upload the .mbox file here</li>
+            </ol>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
       <Card
         className={`p-8 border-2 border-dashed transition-colors cursor-pointer ${
           isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
@@ -200,12 +239,12 @@ const handleFiles = useCallback((files: FileList) => {
         <div className="flex flex-col items-center justify-center space-y-4 text-center">
           <Upload className="h-12 w-12 text-muted-foreground" />
           <div>
-<p className="text-lg font-medium text-foreground">
-  Drag and drop your email files here
-</p>
-<p className="text-sm text-muted-foreground mt-2">
-  Supports .eml (single), .mbox (Gmail/Outlook export), or .zip (multiple emails)
-</p>
+            <p className="text-lg font-medium text-foreground">
+              Drag and drop your email files here
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Supports .eml (single), .mbox (Gmail/Outlook export), or .zip (multiple emails)
+            </p>
             <p className="text-sm text-muted-foreground mt-2">
               All processing happens securely in your browser and your files are never uploaded
             </p>
