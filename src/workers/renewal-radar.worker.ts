@@ -194,7 +194,8 @@ async function parseZipFile(file: File): Promise<SubscriptionItem[]> {
     const uint8Array = new Uint8Array(arrayBuffer);
     
     // Dynamic import fflate
-    const { unzipSync } = await import('fflate');
+    //const { unzipSync } = await import('fflate');
+    import { unzipSync } from 'fflate/browser';
     const unzipped = unzipSync(uint8Array);
     
     for (const [filename, content] of Object.entries(unzipped)) {
