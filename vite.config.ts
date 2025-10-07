@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: {
-          fflate: ['fflate'],
+          fflate: ['fflate', 'fflate/browser'],
         },
       },
     },
