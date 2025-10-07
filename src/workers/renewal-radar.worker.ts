@@ -1,5 +1,5 @@
 import PostalMime from 'postal-mime';
-// Removed: import Mbox from 'node-mbox'; - Not compatible with browser/worker environment
+import { unzipSync } from 'fflate'; // Static import instead of dynamic
 
 import type { SubscriptionItem, WorkerRequest, WorkerResponse } from '@/types/renewal-radar';
 
@@ -151,8 +151,7 @@ async function parseZipFile(file: File): Promise<SubscriptionItem[]> {
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Dynamic import fflate - this will be bundled correctly by Vite
-    const { unzipSync } = await import('fflate');
+    // Use the statically imported unzipSync
     const unzipped = unzipSync(uint8Array);
     
     for (const [filename, content] of Object.entries(unzipped)) {
