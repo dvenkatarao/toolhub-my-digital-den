@@ -58,24 +58,31 @@ const RenewalRadar = () => {
     return workerRef.current;
   }, [toast]);
 
-  const handleFiles = useCallback((files: FileList) => {
-    const emlFiles = Array.from(files).filter(file => 
-      file.name.endsWith('.eml') || file.type === 'message/rfc822'
-    );
+const handleFiles = useCallback((files: FileList) => {
+  const validFiles = Array.from(files).filter(file => {
+    const name = file.name.toLowerCase();
+    return name.endsWith('.eml') || 
+           name.endsWith('.mbox') || 
+           name.endsWith('.mbox.txt') ||
+           name.endsWith('.zip') ||
+           file.type === 'message/rfc822' ||
+           file.type === 'application/mbox' ||
+           file.type === 'application/zip';
+  });
 
-    if (emlFiles.length === 0) {
-      toast({
-        title: 'Invalid files',
-        description: 'Please select .eml email files',
-        variant: 'destructive',
-      });
-      return;
-    }
+  if (validFiles.length === 0) {
+    toast({
+      title: 'Invalid files',
+      description: 'Please select .eml, .mbox, or .zip files',
+      variant: 'destructive',
+    });
+    return;
+  }
 
-    setIsProcessing(true);
-    const worker = initWorker();
-    worker.postMessage({ files: emlFiles });
-  }, [initWorker, toast]);
+  setIsProcessing(true);
+  const worker = initWorker();
+  worker.postMessage({ files: validFiles });
+}, [initWorker, toast]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -193,9 +200,12 @@ const RenewalRadar = () => {
         <div className="flex flex-col items-center justify-center space-y-4 text-center">
           <Upload className="h-12 w-12 text-muted-foreground" />
           <div>
-            <p className="text-lg font-medium text-foreground">
-              Drag and drop your email files (.eml) here
-            </p>
+<p className="text-lg font-medium text-foreground">
+  Drag and drop your email files here
+</p>
+<p className="text-sm text-muted-foreground mt-2">
+  Supports .eml (single), .mbox (Gmail/Outlook export), or .zip (multiple emails)
+</p>
             <p className="text-sm text-muted-foreground mt-2">
               All processing happens securely in your browser and your files are never uploaded
             </p>
@@ -204,14 +214,14 @@ const RenewalRadar = () => {
             Browse Files
           </Button>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".eml,message/rfc822"
-          multiple
-          className="hidden"
-          onChange={handleFileInput}
-        />
+<input
+  ref={fileInputRef}
+  type="file"
+  accept=".eml,.mbox,.zip,message/rfc822,application/mbox,application/zip"
+  multiple
+  className="hidden"
+  onChange={handleFileInput}
+/>
       </Card>
 
       {isProcessing && (
