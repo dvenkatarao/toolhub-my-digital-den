@@ -51,7 +51,8 @@ const fileTools = [
 const personalTools = [
   { title: 'Renewal Radar', url: '/dashboard/renewal-radar', icon: Wallet, premium: true },
   { title: 'Password Manager', url: '/dashboard/password-manager', icon: Lock, premium: true },
-  { title: 'Personal Cloud', url: '/dashboard/personal-cloud', icon: Cloud, premium: true },
+  //{ title: 'Personal Cloud', url: '/dashboard/personal-cloud', icon: Cloud, premium: true },
+  { title: 'Personal Cloud', url: '/dashboard/file-storage', icon: Cloud, premium: true },
   { title: 'Document Manager', url: '/dashboard/document-manager', icon: FolderOpen, premium: true },
   { title: 'Photo Library', url: '/dashboard/photo-library', icon: ImageIcon, premium: true },
 ];
