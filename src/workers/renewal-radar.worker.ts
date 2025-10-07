@@ -1,4 +1,5 @@
 import PostalMime from 'postal-mime';
+import Mbox from 'node-mbox';
 
 import type { SubscriptionItem, WorkerRequest, WorkerResponse } from '@/types/renewal-radar';
 
@@ -118,14 +119,118 @@ async function parseEmailFile(file: File): Promise<SubscriptionItem | null> {
   }
 }
 
+async function parseEmailText(emailText: string): Promise<SubscriptionItem | null> {
+  try {
+    const parser = new PostalMime();
+    const email = await parser.parse(emailText);
+
+    const subject = email.subject || '';
+    const body = email.text || email.html || '';
+    const from = email.from?.address || '';
+    
+    const fullText = `${subject} ${body}`.toLowerCase();
+    
+    const hasSubscriptionKeywords = SUBSCRIPTION_KEYWORDS.some(keyword => 
+      fullText.includes(keyword)
+    );
+
+    if (!hasSubscriptionKeywords) {
+      return null;
+    }
+
+    const vendor = extractVendor(from);
+    const { amount, currency } = extractAmount(fullText);
+    const nextChargeDate = extractDate(fullText);
+    const status = detectStatus(fullText);
+    
+    return {
+      id: generateHash(`${vendor}-${from}-${subject}`),
+      vendor: vendor.charAt(0).toUpperCase() + vendor.slice(1),
+      amount,
+      currency,
+      nextChargeDate,
+      status,
+      rawSubject: subject
+    };
+  } catch (error) {
+    console.error('Error parsing email:', error);
+    return null;
+  }
+}
+
+async function parseEmlFile(file: File): Promise<SubscriptionItem | null> {
+  const text = await file.text();
+  return parseEmailText(text);
+}
+
+async function parseMboxFile(file: File): Promise<SubscriptionItem[]> {
+  const results: SubscriptionItem[] = [];
+  const text = await file.text();
+  
+  // Simple mbox parser (messages are separated by "From " at line start)
+  const messages = text.split(/\nFrom /g);
+  
+  for (const message of messages) {
+    if (!message.trim()) continue;
+    
+    // Re-add the "From " prefix that was removed by split
+    const emailText = message.startsWith('From ') ? message : 'From ' + message;
+    
+    const item = await parseEmailText(emailText);
+    if (item) {
+      results.push(item);
+    }
+  }
+  
+  return results;
+}
+
+async function parseZipFile(file: File): Promise<SubscriptionItem[]> {
+  const results: SubscriptionItem[] = [];
+  
+  try {
+    // Use fflate for lightweight zip parsing in browser
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Dynamic import fflate
+    const { unzipSync } = await import('fflate');
+    const unzipped = unzipSync(uint8Array);
+    
+    for (const [filename, content] of Object.entries(unzipped)) {
+      if (filename.toLowerCase().endsWith('.eml')) {
+        const emailText = new TextDecoder().decode(content);
+        const item = await parseEmailText(emailText);
+        if (item) {
+          results.push(item);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing zip file:', error);
+  }
+  
+  return results;
+}
+
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const files: File[] = e.data.files;
   const results: SubscriptionItem[] = [];
 
   for (const file of files) {
-    const item = await parseEmailFile(file);
-    if (item) {
-      results.push(item);
+    const filename = file.name.toLowerCase();
+    
+    if (filename.endsWith('.mbox') || filename.endsWith('.mbox.txt')) {
+      const items = await parseMboxFile(file);
+      results.push(...items);
+    } else if (filename.endsWith('.zip')) {
+      const items = await parseZipFile(file);
+      results.push(...items);
+    } else if (filename.endsWith('.eml')) {
+      const item = await parseEmlFile(file);
+      if (item) {
+        results.push(item);
+      }
     }
   }
 
