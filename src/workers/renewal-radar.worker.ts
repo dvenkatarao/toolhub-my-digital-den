@@ -1,5 +1,5 @@
 import PostalMime from 'postal-mime';
-import Mbox from 'node-mbox';
+// Removed: import Mbox from 'node-mbox'; - Not compatible with browser/worker environment
 
 import type { SubscriptionItem, WorkerRequest, WorkerResponse } from '@/types/renewal-radar';
 
@@ -78,47 +78,6 @@ function generateHash(text: string): string {
   return Math.abs(hash).toString(36);
 }
 
-async function parseEmailFile(file: File): Promise<SubscriptionItem | null> {
-  try {
-    const text = await file.text();
-    const parser = new PostalMime();
-    const email = await parser.parse(text);
-
-    const subject = email.subject || '';
-    const body = email.text || email.html || '';
-    const from = email.from?.address || '';
-    
-    const fullText = `${subject} ${body}`.toLowerCase();
-    
-    // Check if email contains subscription-related keywords
-    const hasSubscriptionKeywords = SUBSCRIPTION_KEYWORDS.some(keyword => 
-      fullText.includes(keyword)
-    );
-
-    if (!hasSubscriptionKeywords) {
-      return null;
-    }
-
-    const vendor = extractVendor(from);
-    const { amount, currency } = extractAmount(fullText);
-    const nextChargeDate = extractDate(fullText);
-    const status = detectStatus(fullText);
-    
-    return {
-      id: generateHash(`${vendor}-${from}-${subject}`),
-      vendor: vendor.charAt(0).toUpperCase() + vendor.slice(1),
-      amount,
-      currency,
-      nextChargeDate,
-      status,
-      rawSubject: subject
-    };
-  } catch (error) {
-    console.error('Error parsing email:', error);
-    return null;
-  }
-}
-
 async function parseEmailText(emailText: string): Promise<SubscriptionItem | null> {
   try {
     const parser = new PostalMime();
@@ -189,12 +148,11 @@ async function parseZipFile(file: File): Promise<SubscriptionItem[]> {
   const results: SubscriptionItem[] = [];
   
   try {
-    // Use fflate for lightweight zip parsing in browser
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Dynamic import fflate
-    const { unzipSync } = await import('fflate/browser');
+    // Dynamic import fflate - this will be bundled correctly by Vite
+    const { unzipSync } = await import('fflate');
     const unzipped = unzipSync(uint8Array);
     
     for (const [filename, content] of Object.entries(unzipped)) {
