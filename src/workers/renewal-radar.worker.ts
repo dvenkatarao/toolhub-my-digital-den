@@ -1,5 +1,5 @@
 import PostalMime from 'postal-mime';
-import { unzipSync } from 'fflate'; // Static import instead of dynamic
+import { unzipSync } from 'fflate';
 
 import type { SubscriptionItem, WorkerRequest, WorkerResponse } from '@/types/renewal-radar';
 
