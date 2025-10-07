@@ -21,5 +21,14 @@ export default defineConfig(({ mode }) => ({
   },
   worker: {
     format: "es",
+    rollupOptions: {
+      external: [],
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
+  },
+  optimizeDeps: {
+    include: ['fflate', 'postal-mime'],
   },
 }));
