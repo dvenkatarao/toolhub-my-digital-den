@@ -23,7 +23,7 @@ serve(async (req) => {
     const emailRaw = formData.get('email') as string; // SendGrid format
     
     // Parse with PostalMime
-    const parser = new PostalMime.default();
+    const parser = new PostalMime();
     const email = await parser.parse(emailRaw);
     
     const parsedEmail: ParsedEmail = {
@@ -99,7 +99,7 @@ serve(async (req) => {
     return new Response('Email processed', { status: 200 });
   } catch (error) {
     console.error('Error processing email:', error);
-    return new Response(`Error: ${error.message}`, { status: 500 });
+    return new Response(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
   }
 });
 

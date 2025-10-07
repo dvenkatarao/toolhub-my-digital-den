@@ -31,7 +31,7 @@ serve(async (req) => {
     const userId = userData.id;
 
     // Parse email with PostalMime
-    const parser = new PostalMime.default();
+    const parser = new PostalMime();
     const email = await parser.parse(rawEmail);
 
     const emailText = email.text || '';
@@ -118,7 +118,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing subscription email:', error);
     return new Response(
-      JSON.stringify({ error: error.message }), 
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), 
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

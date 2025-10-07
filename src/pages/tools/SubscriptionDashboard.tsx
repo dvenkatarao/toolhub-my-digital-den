@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Mail, Copy, Check, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function SubscriptionDashboard() {
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { user } = useAuth();
   const { toast } = useToast();
   
   const [trackingEmail, setTrackingEmail] = useState('');
@@ -22,20 +22,22 @@ export function SubscriptionDashboard() {
   }, [user]);
 
   const checkProStatus = async () => {
+    if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user?.id)
+      .select('plan')
+      .eq('user_id', user.id)
       .single();
 
-    setIsProUser(data?.subscription_tier === 'pro');
+    setIsProUser(data?.plan === 'PRO');
   };
 
   const fetchTrackingEmail = async () => {
+    if (!user) return;
     const { data } = await supabase
       .from('user_tracking_emails')
       .select('tracking_email')
-      .eq('user_id', user?.id)
+      .eq('user_id', user.id)
       .single();
 
     if (data) {

@@ -39,7 +39,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error sending reminders:', error);
-    return new Response(`Error: ${error.message}`, { status: 500 });
+    return new Response(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
   }
 });
 

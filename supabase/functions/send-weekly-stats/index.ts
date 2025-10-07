@@ -22,7 +22,7 @@ serve(async (req) => {
 
     return new Response('Stats emails sent', { status: 200 });
   } catch (error) {
-    return new Response(`Error: ${error.message}`, { status: 500 });
+    return new Response(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
   }
 });
 
@@ -49,15 +49,15 @@ async function getUserStats(supabase: any, userId: string) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const underutilized = subscriptions?.filter(sub => {
-    const subUsage = usage?.find(u => u.subscription_id === sub.id);
+  const underutilized = subscriptions?.filter((sub: any) => {
+    const subUsage = usage?.find((u: any) => u.subscription_id === sub.id);
     if (!subUsage) return true;
     return new Date(subUsage.last_used_date) < thirtyDaysAgo;
   }) || [];
 
   return {
     ...stats,
-    upcoming: subscriptions?.filter(s => {
+    upcoming: subscriptions?.filter((s: any) => {
       const nextBilling = new Date(s.next_billing_date);
       const weekFromNow = new Date();
       weekFromNow.setDate(weekFromNow.getDate() + 7);
