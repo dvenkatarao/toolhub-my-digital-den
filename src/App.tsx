@@ -22,7 +22,7 @@ import ClocksTimers from "./pages/tools/ClocksTimer";
 import AuraFlow from "./pages/tools/AuraFlow";
 import RenewalRadar from "./pages/tools/RenewalRadar";
 import FileStorage from "./pages/tools/FileStorage";
-import FileStorage from "./pages/tools/PasswordManager";
+import PasswordManager from "./pages/tools/PasswordManager";
 import ToolPlaceholder from "./pages/tools/ToolPlaceholder";
 import { Mail, Shield, FileImage, FileText, Lock, Cloud, FolderOpen, Image as ImageIcon, Calculator, Settings, Clock, Wallet } from "lucide-react";
 import Subscription from "./pages/Subscription";
