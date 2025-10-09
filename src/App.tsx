@@ -60,7 +60,7 @@ const App = () => (
                 <Route path="auraflow" element={<AuraFlow />} />
                 <Route path="renewal-radar" element={<RenewalRadar />} />
                 <Route path="file-storage" element={<FileStorage />} />
-                <Route path="password-manager" element={<PasswordManager title="Password Manager" description="Securely store and manage passwords" icon={Lock} />} />                
+                <Route path="password-manager" element={<PasswordManager />} />                
                 <Route path="image-compressor" element={<ToolPlaceholder title="Image Compressor" description="Compress images without losing quality" icon={FileImage} />} />
                 <Route path="pdf-converter" element={<ToolPlaceholder title="PDF Converter" description="Convert files to and from PDF" icon={FileText} />} />
                 <Route path="personal-cloud" element={<ToolPlaceholder title="Personal Cloud" description="Your private cloud storage" icon={Cloud} />} />
