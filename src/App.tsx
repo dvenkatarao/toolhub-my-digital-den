@@ -59,10 +59,10 @@ const App = () => (
                 <Route path="clocks-timers" element={<ClocksTimers />} />
                 <Route path="auraflow" element={<AuraFlow />} />
                 <Route path="renewal-radar" element={<RenewalRadar />} />
-                <Route path="file-storage" element={<FileStorage />} />                
+                <Route path="file-storage" element={<FileStorage />} />
+                <Route path="password-manager" element={<PasswordManager title="Password Manager" description="Securely store and manage passwords" icon={Lock} />} />                
                 <Route path="image-compressor" element={<ToolPlaceholder title="Image Compressor" description="Compress images without losing quality" icon={FileImage} />} />
                 <Route path="pdf-converter" element={<ToolPlaceholder title="PDF Converter" description="Convert files to and from PDF" icon={FileText} />} />
-                <Route path="password-manager" element={<ToolPlaceholder title="Password Manager" description="Securely store and manage passwords" icon={Lock} />} />
                 <Route path="personal-cloud" element={<ToolPlaceholder title="Personal Cloud" description="Your private cloud storage" icon={Cloud} />} />
                 <Route path="document-manager" element={<ToolPlaceholder title="Document Manager" description="Organize and manage documents" icon={FolderOpen} />} />
                 <Route path="photo-library" element={<ToolPlaceholder title="Photo Library" description="Store and organize your photos" icon={ImageIcon} />} />
