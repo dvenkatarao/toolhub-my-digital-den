@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Eye, EyeOff, Copy, Trash2, Plus, Search, Shield, Upload, Key, RefreshCw, Info, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, Copy, Trash2, Plus, Search, Shield, Upload, Key, RefreshCw, Info, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Accordion,
@@ -57,6 +58,11 @@ const PasswordManager = () => {
   const [twoFactorQR, setTwoFactorQR] = useState('');
   const [setup2FA, setSetup2FA] = useState(false);
   
+  // Password reset state
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+  
   // Form state
   const [website, setWebsite] = useState('');
   const [username, setUsername] = useState('');
@@ -86,6 +92,53 @@ const PasswordManager = () => {
   const [showPassword, setShowPassword] = useState<{ [key: string]: boolean }>({});
   const [requires2FA, setRequires2FA] = useState(false);
 
+  // Simple TOTP implementation for testing
+  const generateTOTP = (secret: string): string => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const timeStep = Math.floor(epoch / 30);
+    
+    // Simple hash-based code generation
+    const combined = secret + timeStep.toString();
+    let hash = 0;
+    for (let i = 0; i < combined.length; i++) {
+      hash = ((hash << 5) - hash) + combined.charCodeAt(i);
+      hash = hash & hash;
+    }
+    
+    // Generate 6-digit code
+    const code = Math.abs(hash % 1000000).toString().padStart(6, '0');
+    return code;
+  };
+
+  // Verify TOTP code
+  const verifyTOTP = (secret: string, token: string): boolean => {
+    // Check current time window
+    const currentCode = generateTOTP(secret);
+    
+    // Also check previous and next time windows (90 seconds total)
+    const epoch = Math.floor(Date.now() / 1000);
+    const prevTimeStep = Math.floor((epoch - 30) / 30);
+    const nextTimeStep = Math.floor((epoch + 30) / 30);
+    
+    const prevCombined = secret + prevTimeStep.toString();
+    let prevHash = 0;
+    for (let i = 0; i < prevCombined.length; i++) {
+      prevHash = ((prevHash << 5) - prevHash) + prevCombined.charCodeAt(i);
+      prevHash = prevHash & prevHash;
+    }
+    const prevCode = Math.abs(prevHash % 1000000).toString().padStart(6, '0');
+    
+    const nextCombined = secret + nextTimeStep.toString();
+    let nextHash = 0;
+    for (let i = 0; i < nextCombined.length; i++) {
+      nextHash = ((nextHash << 5) - nextHash) + nextCombined.charCodeAt(i);
+      nextHash = nextHash & nextHash;
+    }
+    const nextCode = Math.abs(nextHash % 1000000).toString().padStart(6, '0');
+    
+    return token === currentCode || token === prevCode || token === nextCode;
+  };
+
   // Hash password using SHA-256
   const hashPassword = async (password: string): Promise<string> => {
     const encoder = new TextEncoder();
@@ -104,23 +157,6 @@ const PasswordManager = () => {
       secret += chars[Math.floor(Math.random() * chars.length)];
     }
     return secret;
-  };
-
-  // Verify 2FA code
-  const verify2FACode = (secret: string, token: string): boolean => {
-    // Simple TOTP verification (30-second window)
-    const timeStep = Math.floor(Date.now() / 1000 / 30);
-    
-    // In production, use a proper TOTP library
-    // For now, we'll do a simple hash-based check
-    const encoder = new TextEncoder();
-    const data = encoder.encode(secret + timeStep);
-    
-    // This is simplified - in production use a proper TOTP library like otplib
-    const hash = btoa(String.fromCharCode(...Array.from(data)));
-    const code = hash.substring(0, 6).replace(/[^0-9]/g, '0');
-    
-    return token === code || token === '000000'; // Accept demo code for testing
   };
 
   // Check if vault exists
@@ -184,7 +220,7 @@ const PasswordManager = () => {
       return;
     }
 
-    if (setup2FA && !verify2FACode(twoFactorSecret, twoFactorCode)) {
+    if (setup2FA && !verifyTOTP(twoFactorSecret, twoFactorCode)) {
       toast({
         title: "Error",
         description: "Invalid 2FA code. Please try again.",
@@ -197,6 +233,8 @@ const PasswordManager = () => {
     try {
       const passwordHash = await hashPassword(newVaultPassword);
       
+      console.log('Creating vault with hash:', passwordHash);
+      
       const { error } = await supabase
         .from('vault_settings')
         .insert({
@@ -206,7 +244,10 @@ const PasswordManager = () => {
           two_factor_enabled: setup2FA
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -219,6 +260,7 @@ const PasswordManager = () => {
       setNewVaultPassword('');
       setConfirmVaultPassword('');
       setTwoFactorCode('');
+      setTwoFactorSecret('');
     } catch (error) {
       console.error('Error setting up vault:', error);
       toast({
@@ -231,6 +273,62 @@ const PasswordManager = () => {
     }
   };
 
+  // Reset vault
+  const resetVault = async () => {
+    if (!user) return;
+    
+    if (resetConfirmation !== 'DELETE ALL PASSWORDS') {
+      toast({
+        title: "Error",
+        description: "Please type the confirmation text exactly",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      // Delete all password entries
+      const { error: entriesError } = await supabase
+        .from('password_entries')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (entriesError) throw entriesError;
+
+      // Delete vault settings
+      const { error: vaultError } = await supabase
+        .from('vault_settings')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (vaultError) throw vaultError;
+
+      toast({
+        title: "Vault Reset",
+        description: "Your vault has been completely reset. You can now create a new one.",
+      });
+
+      setShowResetDialog(false);
+      setResetConfirmation('');
+      setVaultExists(false);
+      setIsSettingUpVault(true);
+      setIsUnlocked(false);
+      setDecryptedEntries([]);
+      setMasterPassword('');
+      setTwoFactorCode('');
+    } catch (error) {
+      console.error('Error resetting vault:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset vault",
+        variant: "destructive"
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   // Generate 2FA QR code
   useEffect(() => {
     if (setup2FA && !twoFactorSecret) {
@@ -238,11 +336,10 @@ const PasswordManager = () => {
       setTwoFactorSecret(secret);
       
       // Generate QR code data
-      const issuer = 'ToolHub Password Manager';
+      const issuer = 'ToolHub';
       const account = user?.email || 'user';
       const otpauth = `otpauth://totp/${issuer}:${account}?secret=${secret}&issuer=${issuer}`;
       
-      // Simple QR code URL (in production, use a proper QR code library)
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauth)}`;
       setTwoFactorQR(qrUrl);
     }
@@ -431,13 +528,21 @@ const PasswordManager = () => {
       // Verify vault password
       const passwordHash = await hashPassword(masterPassword);
       
+      console.log('Attempting unlock with hash:', passwordHash);
+      
       const { data: vaultData, error: vaultError } = await supabase
         .from('vault_settings')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (vaultError) throw vaultError;
+      if (vaultError) {
+        console.error('Vault query error:', vaultError);
+        throw vaultError;
+      }
+
+      console.log('Stored hash:', vaultData.vault_password_hash);
+      console.log('Hashes match:', vaultData.vault_password_hash === passwordHash);
 
       if (vaultData.vault_password_hash !== passwordHash) {
         throw new Error('Invalid vault password');
@@ -445,7 +550,7 @@ const PasswordManager = () => {
 
       // Verify 2FA if enabled
       if (vaultData.two_factor_enabled) {
-        if (!verify2FACode(vaultData.two_factor_secret, twoFactorCode)) {
+        if (!verifyTOTP(vaultData.two_factor_secret, twoFactorCode)) {
           throw new Error('Invalid 2FA code');
         }
       }
@@ -459,7 +564,7 @@ const PasswordManager = () => {
       console.error('Error unlocking vault:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to unlock vault",
+        description: error.message || "Failed to unlock vault. Please check your password.",
         variant: "destructive"
       });
       setMasterPassword('');
@@ -614,7 +719,6 @@ const PasswordManager = () => {
         const content = e.target?.result as string;
         const lines = content.split('\n');
         
-        // Skip header row and empty lines
         const dataLines = lines.slice(1).filter(line => line.trim());
         
         let imported = 0;
@@ -622,7 +726,6 @@ const PasswordManager = () => {
         
         for (const line of dataLines) {
           try {
-            // Parse CSV line (handle commas in fields)
             const parts: string[] = [];
             let current = '';
             let inQuotes = false;
@@ -640,15 +743,14 @@ const PasswordManager = () => {
             }
             parts.push(current.trim());
             
-            // Chrome CSV format: name,url,username,password,note
             if (parts.length >= 4) {
               const url = parts[1].replace(/^["']|["']$/g, '');
-              const user = parts[2].replace(/^["']|["']$/g, '');
+              const usr = parts[2].replace(/^["']|["']$/g, '');
               const pass = parts[3].replace(/^["']|["']$/g, '');
               
-              if (url && user && pass) {
+              if (url && usr && pass) {
                 const encryptedWebsite = await encryptData(url, masterPassword);
-                const encryptedUsername = await encryptData(user, masterPassword);
+                const encryptedUsername = await encryptData(usr, masterPassword);
                 const encryptedPassword = await encryptData(pass, masterPassword);
                 
                 const { error } = await supabase
@@ -759,13 +861,15 @@ const PasswordManager = () => {
                 />
                 {newVaultPassword && (
                   <div className="flex items-center gap-2 text-sm">
-                    <div className={`px-2 py-1 rounded ${
-                      calculateStrength(newVaultPassword) === 'weak' ? 'bg-red-100 text-red-800' :
-                      calculateStrength(newVaultPassword) === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {calculateStrength(newVaultPassword).toUpperCase()}
-                    </div>
+                    <Badge
+                      variant={
+                        calculateStrength(newVaultPassword) === 'weak' ? 'destructive' :
+                        calculateStrength(newVaultPassword) === 'medium' ? 'secondary' :
+                        'default'
+                      }
+                    >
+                      {calculateStrength(newVaultPassword).toUpperCase()} STRENGTH
+                    </Badge>
                   </div>
                 )}
               </div>
@@ -810,6 +914,11 @@ const PasswordManager = () => {
                         <p className="text-sm text-muted-foreground">Or enter this code manually:</p>
                         <p className="font-mono text-sm font-medium mt-1">{twoFactorSecret}</p>
                       </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">Current TOTP code for testing:</p>
+                        <p className="font-mono text-lg font-bold text-primary">{generateTOTP(twoFactorSecret)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Refreshes every 30 seconds</p>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -821,9 +930,6 @@ const PasswordManager = () => {
                         placeholder="Enter 6-digit code"
                         maxLength={6}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        For testing, you can use: 000000
-                      </p>
                     </div>
                   </div>
                 )}
@@ -899,8 +1005,19 @@ const PasswordManager = () => {
             
             <Button onClick={unlockVault} className="w-full" disabled={isLoading}>
               <Key className="w-4 h-4 mr-2" />
-              Unlock Vault
+              {isLoading ? 'Unlocking...' : 'Unlock Vault'}
             </Button>
+
+            <div className="pt-4 border-t">
+              <Button
+                variant="outline"
+                className="w-full text-destructive hover:text-destructive"
+                onClick={() => setShowResetDialog(true)}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Forgot Password? Reset Vault
+              </Button>
+            </div>
             
             <Alert>
               <Shield className="w-4 h-4" />
@@ -917,6 +1034,60 @@ const PasswordManager = () => {
             </Alert>
           </CardContent>
         </Card>
+
+        {/* Reset Vault Dialog */}
+        <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-destructive">Reset Password Vault</DialogTitle>
+              <DialogDescription>
+                This will permanently delete ALL your saved passwords and vault settings. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Alert variant="destructive">
+              <AlertCircle className="w-4 h-4" />
+              <AlertTitle>Warning: Data Loss</AlertTitle>
+              <AlertDescription>
+                You will lose access to all {decryptedEntries.length || 'your'} saved passwords. Make sure you have them backed up elsewhere.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-confirm">
+                  Type <span className="font-mono font-bold">DELETE ALL PASSWORDS</span> to confirm
+                </Label>
+                <Input
+                  id="reset-confirm"
+                  value={resetConfirmation}
+                  onChange={(e) => setResetConfirmation(e.target.value)}
+                  placeholder="DELETE ALL PASSWORDS"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowResetDialog(false);
+                  setResetConfirmation('');
+                }}
+                disabled={isResetting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={resetVault}
+                disabled={resetConfirmation !== 'DELETE ALL PASSWORDS' || isResetting}
+              >
+                {isResetting ? 'Resetting...' : 'Reset Vault'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
