@@ -1,7 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LockClosedIcon } from '@heroicons/react/24/outline';
+import { Lock, Eye, EyeOff, Copy, Trash2, Plus, Search, Shield, Upload, Key, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Slider } from '@/components/ui/slider';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PasswordEntry {
   id: string;
@@ -9,80 +20,53 @@ interface PasswordEntry {
   username: string;
   password: string;
   strength: 'weak' | 'medium' | 'strong';
+  created_at?: string;
+}
+
+interface EncryptedEntry {
+  id: string;
+  user_id: string;
+  website: string;
+  username: string;
+  password: string;
+  strength: 'weak' | 'medium' | 'strong';
+  created_at: string;
+  updated_at: string;
 }
 
 const PasswordManager = () => {
-  // State for form inputs
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  // Form state
   const [website, setWebsite] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
-  // State for password generator
+  // Password generator state
   const [passwordLength, setPasswordLength] = useState(12);
   const [includeUppercase, setIncludeUppercase] = useState(true);
   const [includeLowercase, setIncludeLowercase] = useState(true);
   const [includeNumbers, setIncludeNumbers] = useState(true);
   const [includeSymbols, setIncludeSymbols] = useState(true);
   
-  // State for password entries (encrypted)
-  const [encryptedEntries, setEncryptedEntries] = useState<any[]>([]);
-  
-  // State for decrypted entries (visible to user)
+  // Password entries
   const [decryptedEntries, setDecryptedEntries] = useState<PasswordEntry[]>([]);
-  
-  // State for search
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
-  // State for import functionality
+  // Import state
   const [importSource, setImportSource] = useState('chrome');
   const [importData, setImportData] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Encryption state
+  // Master password state
   const [masterPassword, setMasterPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showMasterPassword, setShowMasterPassword] = useState(false);
-  
-  // Filter entries based on search term
-  const filteredEntries = decryptedEntries.filter(entry => 
-    entry.website.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.username.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  // Generate password
-  const generatePassword = () => {
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    
-    let characters = '';
-    if (includeUppercase) characters += uppercase;
-    if (includeLowercase) characters += lowercase;
-    if (includeNumbers) characters += numbers;
-    if (includeSymbols) characters += symbols;
-    
-    if (characters === '') {
-      alert('Please select at least one character type');
-      return;
-    }
-    
-    let result = '';
-    for (let i = 0; i < passwordLength; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    
-    setPassword(result);
-  };
-  
-  // Calculate password strength
-  const calculateStrength = (pwd: string): 'weak' | 'medium' | 'strong' => {
-    if (pwd.length < 6) return 'weak';
-    if (pwd.length < 10) return 'medium';
-    return 'strong';
-  };
-  
-  // Encryption helper functions
+  const [showPassword, setShowPassword] = useState<{ [key: string]: boolean }>({});
+
+  // Encryption functions
   const deriveKey = async (password: string, salt: Uint8Array) => {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
@@ -149,105 +133,240 @@ const PasswordManager = () => {
       
       return decoder.decode(decryptedData);
     } catch (error) {
-      throw new Error('Decryption failed. Invalid master password.');
+      throw new Error('Decryption failed');
     }
   };
-  
-  // Unlock vault with master password
-  const unlockVault = async () => {
-    if (!masterPassword) {
-      alert('Please enter your master password');
+
+  // Calculate password strength
+  const calculateStrength = (pwd: string): 'weak' | 'medium' | 'strong' => {
+    if (pwd.length < 8) return 'weak';
+    if (pwd.length < 12) return 'medium';
+    return 'strong';
+  };
+
+  // Generate password
+  const generatePassword = () => {
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    
+    let characters = '';
+    if (includeUppercase) characters += uppercase;
+    if (includeLowercase) characters += lowercase;
+    if (includeNumbers) characters += numbers;
+    if (includeSymbols) characters += symbols;
+    
+    if (characters === '') {
+      toast({
+        title: "Error",
+        description: "Please select at least one character type",
+        variant: "destructive"
+      });
       return;
     }
     
+    let result = '';
+    for (let i = 0; i < passwordLength; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    
+    setPassword(result);
+  };
+
+  // Load encrypted entries from Supabase
+  const loadEntries = async () => {
+    if (!user || !isUnlocked) return;
+    
+    setIsLoading(true);
     try {
-      const decryptedList = await Promise.all(
-        encryptedEntries.map(async (entry) => {
-          return {
+      const { data, error } = await supabase
+        .from('password_entries')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const decrypted = await Promise.all(
+          data.map(async (entry: EncryptedEntry) => ({
             id: entry.id,
             website: await decryptData(entry.website, masterPassword),
             username: await decryptData(entry.username, masterPassword),
             password: await decryptData(entry.password, masterPassword),
-            strength: entry.strength
-          };
-        })
-      );
-      
-      setDecryptedEntries(decryptedList);
-      setIsUnlocked(true);
+            strength: entry.strength,
+            created_at: entry.created_at
+          }))
+        );
+        setDecryptedEntries(decrypted);
+      }
     } catch (error) {
-      alert('Incorrect master password. Please try again.');
+      console.error('Error loading entries:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load password entries. Please check your master password.",
+        variant: "destructive"
+      });
+      lockVault();
+    } finally {
+      setIsLoading(false);
     }
   };
-  
+
+  // Unlock vault
+  const unlockVault = async () => {
+    if (!masterPassword) {
+      toast({
+        title: "Error",
+        description: "Please enter your master password",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsUnlocked(true);
+    toast({
+      title: "Success",
+      description: "Vault unlocked successfully"
+    });
+  };
+
   // Lock vault
   const lockVault = () => {
     setIsUnlocked(false);
     setDecryptedEntries([]);
     setMasterPassword('');
+    setWebsite('');
+    setUsername('');
+    setPassword('');
   };
-  
-  // Add new password entry
+
+  // Add password entry
   const addPasswordEntry = async () => {
     if (!website || !username || !password) {
-      alert('Please fill in all fields');
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive"
+      });
       return;
     }
     
-    if (!isUnlocked) {
-      alert('Please unlock the vault first');
+    if (!isUnlocked || !user) {
+      toast({
+        title: "Error",
+        description: "Please unlock the vault first",
+        variant: "destructive"
+      });
       return;
     }
     
+    setIsLoading(true);
     try {
-      const newEntry = {
-        id: Date.now().toString(),
-        website: await encryptData(website, masterPassword),
-        username: await encryptData(username, masterPassword),
-        password: await encryptData(password, masterPassword),
-        strength: calculateStrength(password),
+      const encryptedWebsite = await encryptData(website, masterPassword);
+      const encryptedUsername = await encryptData(username, masterPassword);
+      const encryptedPassword = await encryptData(password, masterPassword);
+      
+      const { data, error } = await supabase
+        .from('password_entries')
+        .insert({
+          user_id: user.id,
+          website: encryptedWebsite,
+          username: encryptedUsername,
+          password: encryptedPassword,
+          strength: calculateStrength(password)
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newEntry: PasswordEntry = {
+        id: data.id,
+        website,
+        username,
+        password,
+        strength: calculateStrength(password)
       };
       
-      setEncryptedEntries([newEntry, ...encryptedEntries]);
-      setDecryptedEntries([{ ...newEntry, website, username, password }, ...decryptedEntries]);
+      setDecryptedEntries([newEntry, ...decryptedEntries]);
       
-      // Reset form
       setWebsite('');
       setUsername('');
       setPassword('');
+      
+      toast({
+        title: "Success",
+        description: "Password saved successfully"
+      });
     } catch (error) {
-      alert('Failed to encrypt password. Please try again.');
+      console.error('Error saving password:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save password",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
-  
-  // Delete password entry
-  const deleteEntry = (id: string) => {
-    setEncryptedEntries(encryptedEntries.filter(entry => entry.id !== id));
-    setDecryptedEntries(decryptedEntries.filter(entry => entry.id !== id));
+
+  // Delete entry
+  const deleteEntry = async (id: string) => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('password_entries')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setDecryptedEntries(decryptedEntries.filter(entry => entry.id !== id));
+      
+      toast({
+        title: "Success",
+        description: "Password deleted successfully"
+      });
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete password",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
-  // Copy password to clipboard
+
+  // Copy to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('Password copied to clipboard!');
+    toast({
+      title: "Copied",
+      description: "Copied to clipboard"
+    });
   };
-  
-  // Handle file selection
+
+  // Handle import
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setImportData(e.target.files[0]);
     }
   };
-  
-  // Handle import process
+
   const handleImport = async () => {
-    if (!importData) {
-      alert('Please select a file to import');
-      return;
-    }
-    
-    if (!isUnlocked) {
-      alert('Please unlock the vault first');
+    if (!importData || !isUnlocked || !user) {
+      toast({
+        title: "Error",
+        description: "Please select a file and unlock the vault",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -255,574 +374,407 @@ const PasswordManager = () => {
     reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
-        let importedEntries: any[] = [];
+        const lines = content.split('\n').slice(1);
+        let imported = 0;
         
-        // Parse based on selected source
-        if (importSource === 'chrome') {
-          // Chrome CSV format
-          const lines = content.split('\n').slice(1); // Skip header
-          for (const line of lines) {
-            const [name, url, username, password] = line.split(',');
-            if (url && username && password) {
-              const cleanUrl = url.replace(/"/g, '');
-              const cleanUsername = username.replace(/"/g, '');
-              const cleanPassword = password.replace(/"/g, '');
-              
-              importedEntries.push({
-                id: Date.now().toString() + Math.random(),
-                website: await encryptData(cleanUrl, masterPassword),
-                username: await encryptData(cleanUsername, masterPassword),
-                password: await encryptData(cleanPassword, masterPassword),
-                strength: calculateStrength(cleanPassword),
-              });
-            }
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          const parts = line.split(',').map(p => p.replace(/"/g, '').trim());
+          let url = '', user = '', pass = '';
+          
+          if (importSource === 'chrome' && parts.length >= 4) {
+            [, url, user, pass] = parts;
+          } else if (importSource === 'firefox' && parts.length >= 3) {
+            [url, user, pass] = parts;
+          } else if (importSource === 'lastpass' && parts.length >= 4) {
+            [, url, user, pass] = parts;
           }
-        } else if (importSource === 'firefox') {
-          // Firefox CSV format
-          const lines = content.split('\n').slice(1);
-          for (const line of lines) {
-            const [url, username, password] = line.split(',');
-            if (url && username && password) {
-              const cleanUrl = url.replace(/"/g, '');
-              const cleanUsername = username.replace(/"/g, '');
-              const cleanPassword = password.replace(/"/g, '');
-              
-              importedEntries.push({
-                id: Date.now().toString() + Math.random(),
-                website: await encryptData(cleanUrl, masterPassword),
-                username: await encryptData(cleanUsername, masterPassword),
-                password: await encryptData(cleanPassword, masterPassword),
-                strength: calculateStrength(cleanPassword),
+          
+          if (url && user && pass) {
+            const encryptedWebsite = await encryptData(url, masterPassword);
+            const encryptedUsername = await encryptData(user, masterPassword);
+            const encryptedPassword = await encryptData(pass, masterPassword);
+            
+            await supabase
+              .from('password_entries')
+              .insert({
+                user_id: user.id,
+                website: encryptedWebsite,
+                username: encryptedUsername,
+                password: encryptedPassword,
+                strength: calculateStrength(pass)
               });
-            }
+            
+            imported++;
           }
-        } else if (importSource === 'lastpass') {
-          // LastPass CSV format
-          const lines = content.split('\n').slice(1);
-          for (const line of lines) {
-            const [name, url, username, password] = line.split(',');
-            if (url && username && password) {
-              const cleanUrl = url.replace(/"/g, '');
-              const cleanUsername = username.replace(/"/g, '');
-              const cleanPassword = password.replace(/"/g, '');
-              
-              importedEntries.push({
-                id: Date.now().toString() + Math.random(),
-                website: await encryptData(cleanUrl, masterPassword),
-                username: await encryptData(cleanUsername, masterPassword),
-                password: await encryptData(cleanPassword, masterPassword),
-                strength: calculateStrength(cleanPassword),
-              });
-            }
-          }
-        } else {
-          alert('Unsupported import format');
-          return;
         }
         
-        // Add imported entries to existing entries
-        setEncryptedEntries([...importedEntries, ...encryptedEntries]);
-        alert(`Successfully imported ${importedEntries.length} passwords!`);
+        await loadEntries();
         
-        // Reset import state
+        toast({
+          title: "Success",
+          description: `Imported ${imported} passwords successfully`
+        });
+        
         setImportData(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
       } catch (error) {
         console.error('Import error:', error);
-        alert('Failed to import passwords. Please check the file format.');
+        toast({
+          title: "Error",
+          description: "Failed to import passwords",
+          variant: "destructive"
+        });
       }
     };
     
     reader.readAsText(importData);
   };
-  
-  // Initialize with a generated password
+
+  // Filter entries
+  const filteredEntries = decryptedEntries.filter(entry => 
+    entry.website.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    entry.username.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Load entries when unlocked
+  useEffect(() => {
+    if (isUnlocked) {
+      loadEntries();
+    }
+  }, [isUnlocked]);
+
+  // Initialize with generated password
   useEffect(() => {
     generatePassword();
   }, []);
-  
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <header className="mb-8 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Secure Password Manager</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Your passwords are encrypted with a master password before storage. Never stored in plain text.
-          </p>
-        </header>
-        
-        {/* Master Password Unlock */}
-        {!isUnlocked ? (
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6 max-w-md mx-auto">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">Unlock Password Vault</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Master Password</label>
-                <div className="relative">
-                  <input
-                    type={showMasterPassword ? "text" : "password"}
-                    value={masterPassword}
-                    onChange={(e) => setMasterPassword(e.target.value)}
-                    placeholder="Enter your master password"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <button
-                    onClick={() => setShowMasterPassword(!showMasterPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    {showMasterPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
+
+  if (!isUnlocked) {
+    return (
+      <div className="container mx-auto p-6 max-w-md">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <Lock className="w-6 h-6 text-primary" />
+            </div>
+            <CardTitle>Unlock Password Vault</CardTitle>
+            <CardDescription>
+              Enter your master password to access your encrypted passwords
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="master-password">Master Password</Label>
+              <div className="relative">
+                <Input
+                  id="master-password"
+                  type={showMasterPassword ? "text" : "password"}
+                  value={masterPassword}
+                  onChange={(e) => setMasterPassword(e.target.value)}
+                  placeholder="Enter your master password"
+                  onKeyDown={(e) => e.key === 'Enter' && unlockVault()}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowMasterPassword(!showMasterPassword)}
+                >
+                  {showMasterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
               </div>
-              
-              <button 
-                onClick={unlockVault}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-              >
-                Unlock Vault
-              </button>
-              
-              <div className="text-sm text-gray-600 mt-4">
-                <p className="font-medium">Security Information:</p>
-                <ul className="list-disc pl-5 mt-1 space-y-1">
-                  <li>Passwords are encrypted with AES-256-GCM</li>
-                  <li>Master password is never stored or transmitted</li>
-                  <li>Each entry uses a unique salt and IV</li>
+            </div>
+            
+            <Button onClick={unlockVault} className="w-full">
+              <Key className="w-4 h-4 mr-2" />
+              Unlock Vault
+            </Button>
+            
+            <Alert>
+              <Shield className="w-4 h-4" />
+              <AlertDescription>
+                <p className="font-medium mb-2">Security Features:</p>
+                <ul className="text-sm space-y-1">
+                  <li>• AES-256-GCM encryption</li>
+                  <li>• PBKDF2 key derivation (100k iterations)</li>
+                  <li>• Master password never stored</li>
+                  <li>• Unique salt & IV per entry</li>
                 </ul>
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Password Manager</h1>
+          <p className="text-muted-foreground">Securely manage your passwords</p>
+        </div>
+        <Button onClick={lockVault} variant="outline">
+          <Lock className="w-4 h-4 mr-2" />
+          Lock Vault
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Add password */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Add New Password</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="example.com"
+                />
               </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-between items-center mb-6">
-              <div className="text-lg font-medium text-gray-700">
-                Vault Status: <span className="text-green-600 font-semibold">Unlocked</span>
+              
+              <div className="space-y-2">
+                <Label htmlFor="username">Username/Email</Label>
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="user@example.com"
+                />
               </div>
-              <button 
-                onClick={lockVault}
-                className="flex items-center text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition duration-200"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Lock Vault
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column - Form, Generator, and Import */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Add Password Form */}
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Add New Password</h2>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                      <input
-                        type="text"
-                        value={website}
-                        onChange={(e) => setWebsite(e.target.value)}
-                        placeholder="example.com"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Username/Email</label>
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="user@example.com"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                      <div className="flex">
-                        <input
-                          type="text"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Enter or generate password"
-                          className="flex-grow px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <button 
-                          onClick={() => copyToClipboard(password)}
-                          className="bg-gray-200 hover:bg-gray-300 px-4 py-2 border border-l-0 border-gray-300 rounded-r-lg text-gray-700"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <button 
-                      onClick={addPasswordEntry}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-                    >
-                      Save Password
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Password Generator */}
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Password Generator</h2>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Length: {passwordLength}
-                      </label>
-                      <input
-                        type="range"
-                        min="6"
-                        max="30"
-                        value={passwordLength}
-                        onChange={(e) => setPasswordLength(parseInt(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="uppercase"
-                          checked={includeUppercase}
-                          onChange={(e) => setIncludeUppercase(e.target.checked)}
-                          className="h-4 w-4 text-blue-600 rounded"
-                        />
-                        <label htmlFor="uppercase" className="ml-2 text-sm text-gray-700">Uppercase</label>
-                      </div>
-                      
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="lowercase"
-                          checked={includeLowercase}
-                          onChange={(e) => setIncludeLowercase(e.target.checked)}
-                          className="h-4 w-4 text-blue-600 rounded"
-                        />
-                        <label htmlFor="lowercase" className="ml-2 text-sm text-gray-700">Lowercase</label>
-                      </div>
-                      
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="numbers"
-                          checked={includeNumbers}
-                          onChange={(e) => setIncludeNumbers(e.target.checked)}
-                          className="h-4 w-4 text-blue-600 rounded"
-                        />
-                        <label htmlFor="numbers" className="ml-2 text-sm text-gray-700">Numbers</label>
-                      </div>
-                      
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="symbols"
-                          checked={includeSymbols}
-                          onChange={(e) => setIncludeSymbols(e.target.checked)}
-                          className="h-4 w-4 text-blue-600 rounded"
-                        />
-                        <label htmlFor="symbols" className="ml-2 text-sm text-gray-700">Symbols</label>
-                      </div>
-                    </div>
-                    
-                    <div className="flex space-x-3">
-                      <button 
-                        onClick={generatePassword}
-                        className="flex-grow bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-                      >
-                        Generate Password
-                      </button>
-                      <button 
-                        onClick={() => copyToClipboard(password)}
-                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition duration-200"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Import Passwords */}
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Import Passwords</h2>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Import From</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          onClick={() => setImportSource('chrome')}
-                          className={`py-3 px-4 rounded-lg border ${
-                            importSource === 'chrome'
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center">
-                            <div className="bg-gray-200 border-2 border-dashed rounded-xl w-8 h-8 mr-2" />
-                            <span>Chrome</span>
-                          </div>
-                        </button>
-                        
-                        <button
-                          onClick={() => setImportSource('firefox')}
-                          className={`py-3 px-4 rounded-lg border ${
-                            importSource === 'firefox'
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center">
-                            <div className="bg-gray-200 border-2 border-dashed rounded-xl w-8 h-8 mr-2" />
-                            <span>Firefox</span>
-                          </div>
-                        </button>
-                        
-                        <button
-                          onClick={() => setImportSource('lastpass')}
-                          className={`py-3 px-4 rounded-lg border ${
-                            importSource === 'lastpass'
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center">
-                            <div className="bg-gray-200 border-2 border-dashed rounded-xl w-8 h-8 mr-2" />
-                            <span>LastPass</span>
-                          </div>
-                        </button>
-                        
-                        <button
-                          onClick={() => setImportSource('other')}
-                          className={`py-3 px-4 rounded-lg border ${
-                            importSource === 'other'
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center">
-                            <div className="bg-gray-200 border-2 border-dashed rounded-xl w-8 h-8 mr-2" />
-                            <span>Other</span>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Select CSV File</label>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept=".csv"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                      />
-                      <p className="mt-1 text-sm text-gray-500">
-                        {importSource === 'chrome' && 'Export passwords from Chrome: Settings > Passwords > Export passwords'}
-                        {importSource === 'firefox' && 'Export passwords from Firefox: Logins & Passwords > Options > Export Logins'}
-                        {importSource === 'lastpass' && 'Export from LastPass: Advanced > Export > LastPass CSV File'}
-                        {importSource === 'other' && 'Import CSV with columns: name,url,username,password'}
-                      </p>
-                    </div>
-                    
-                    <button 
-                      onClick={handleImport}
-                      disabled={!importData}
-                      className={`w-full font-medium py-2 px-4 rounded-lg transition duration-200 ${
-                        importData 
-                          ? 'bg-green-600 hover:bg-green-700 text-white' 
-                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      }`}
-                    >
-                      Import Passwords
-                    </button>
-                  </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter or generate password"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => copyToClipboard(password)}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
               
-              {/* Right Column - Password List */}
-              <div className="space-y-6">
-                {/* Search */}
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold text-gray-800">Saved Passwords</h2>
-                    <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">
-                      {decryptedEntries.length} entries
-                    </span>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Search passwords..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  {/* Password Entries */}
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                    {filteredEntries.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No passwords found. Add your first password!
-                      </div>
-                    ) : (
-                      filteredEntries.map((entry) => (
-                        <div key={entry.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition duration-150">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-medium text-gray-800">{entry.website}</h3>
-                              <p className="text-sm text-gray-600">{entry.username}</p>
-                            </div>
-                            <span className={`text-xs font-medium px-2 py-1 rounded ${
-                              entry.strength === 'weak' 
-                                ? 'bg-red-100 text-red-800' 
-                                : entry.strength === 'medium' 
-                                  ? 'bg-yellow-100 text-yellow-800' 
-                                  : 'bg-green-100 text-green-800'
-                            }`}>
-                              {entry.strength}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center mt-3">
-                            <div className="flex-grow bg-gray-100 rounded px-3 py-2 text-sm font-mono truncate">
-                              {entry.password.replace(/./g, '•')}
-                            </div>
-                            <div className="flex space-x-2 ml-2">
-                              <button 
-                                onClick={() => copyToClipboard(entry.password)}
-                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                                title="Copy password"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
-                              <button 
-                                onClick={() => deleteEntry(entry.id)}
-                                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                                title="Delete password"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+              <Button onClick={addPasswordEntry} className="w-full" disabled={isLoading}>
+                <Plus className="w-4 h-4 mr-2" />
+                Save Password
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Password generator */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Password Generator</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Length: {passwordLength}</Label>
+                <Slider
+                  value={[passwordLength]}
+                  onValueChange={(value) => setPasswordLength(value[0])}
+                  min={6}
+                  max={30}
+                  step={1}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="uppercase"
+                    checked={includeUppercase}
+                    onCheckedChange={(checked) => setIncludeUppercase(checked as boolean)}
+                  />
+                  <Label htmlFor="uppercase">Uppercase</Label>
                 </div>
                 
-                {/* Security Tips */}
-                <div className="bg-white rounded-xl shadow-md p-6">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Security Tips</h2>
-                  <ul className="space-y-2 text-sm text-gray-600">
-                    <li className="flex items-start">
-                      <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Use a strong master password with at least 12 characters</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Enable two-factor authentication when available</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Update passwords regularly</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg className="h-5 w-5 text-green-500 mr-2 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Never share your master password</span>
-                    </li>
-                  </ul>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="lowercase"
+                    checked={includeLowercase}
+                    onCheckedChange={(checked) => setIncludeLowercase(checked as boolean)}
+                  />
+                  <Label htmlFor="lowercase">Lowercase</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="numbers"
+                    checked={includeNumbers}
+                    onCheckedChange={(checked) => setIncludeNumbers(checked as boolean)}
+                  />
+                  <Label htmlFor="numbers">Numbers</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="symbols"
+                    checked={includeSymbols}
+                    onCheckedChange={(checked) => setIncludeSymbols(checked as boolean)}
+                  />
+                  <Label htmlFor="symbols">Symbols</Label>
                 </div>
               </div>
-            </div>
-          </>
-        )}
+              
+              <div className="flex gap-2">
+                <Button onClick={generatePassword} className="flex-1">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Generate
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => copyToClipboard(password)}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Import */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Passwords</CardTitle>
+              <CardDescription>Import from browser or password manager</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                {['chrome', 'firefox', 'lastpass', 'other'].map((source) => (
+                  <Button
+                    key={source}
+                    variant={importSource === source ? "default" : "outline"}
+                    onClick={() => setImportSource(source)}
+                    className="capitalize"
+                  >
+                    {source}
+                  </Button>
+                ))}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="file">CSV File</Label>
+                <Input
+                  id="file"
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".csv"
+                />
+              </div>
+              
+              <Button onClick={handleImport} disabled={!importData || isLoading} className="w-full">
+                <Upload className="w-4 h-4 mr-2" />
+                Import Passwords
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Saved Passwords</CardTitle>
+                <Badge>{decryptedEntries.length}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search passwords..."
+                  className="pl-9"
+                />
+              </div>
+              
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {filteredEntries.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {searchTerm ? 'No passwords found' : 'No passwords yet'}
+                  </div>
+                ) : (
+                  filteredEntries.map((entry) => (
+                    <Card key={entry.id}>
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <p className="font-medium">{entry.website}</p>
+                            <p className="text-sm text-muted-foreground">{entry.username}</p>
+                          </div>
+                          <Badge
+                            variant={
+                              entry.strength === 'weak' ? 'destructive' :
+                              entry.strength === 'medium' ? 'secondary' :
+                              'default'
+                            }
+                          >
+                            {entry.strength}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type={showPassword[entry.id] ? "text" : "password"}
+                            value={entry.password}
+                            readOnly
+                            className="flex-1 font-mono text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setShowPassword({ ...showPassword, [entry.id]: !showPassword[entry.id] })}
+                          >
+                            {showPassword[entry.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyToClipboard(entry.password)}
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteEntry(entry.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
 };
 
 export default PasswordManager;
-
-/*
-Additional Integration Instructions:
-
-1. Place this file at: src/app/password-manager/page.tsx
-
-2. Update your sidebar navigation (src/components/Sidebar.tsx) to include a link to the password manager:
-
-import { LockClosedIcon } from '@heroicons/react/24/outline';
-
-// Inside your Sidebar component's nav section, add:
-<Link
-  href="/password-manager"
-  className="flex items-center px-4 py-2 mt-5 text-gray-600 hover:bg-gray-200 hover:text-gray-900 rounded-lg"
->
-  <LockClosedIcon className="w-5 h-5" />
-  <span className="mx-4 font-medium">Password Manager</span>
-</Link>
-
-3. Install Heroicons if not already installed:
-
-npm install @heroicons/react
-
-4. Backend API Implementation:
-
-Create a new API route at src/app/api/passwords/route.ts with POST, GET, DELETE handlers to store, retrieve, and delete encrypted password entries. Use your existing authentication setup (e.g., next-auth) to secure these endpoints.
-
-5. Update your Prisma schema (prisma/schema.prisma) to add a Password model:
-
-model Password {
-  id         String   @id @default(cuid())
-  userId     String
-  website    String
-  username   String
-  password   String
-  strength   String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-6. Run Prisma migration:
-
-npx prisma migrate dev --name add_password_model
-
-7. Modify the frontend component to fetch and save passwords via the API endpoints instead of local state.
-
-This approach ensures your password manager is fully integrated, secure, and consistent with your ToolHub app's design and architecture.
-*/
