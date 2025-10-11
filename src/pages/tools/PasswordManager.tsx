@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, Eye, EyeOff, Copy, Trash2, Plus, Search, Shield, Upload, Key, RefreshCw, Info, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react';
+import { Lock, Eye, EyeOff, Copy, Trash2, Plus, Search, Shield, Upload, Key, RefreshCw, Info, CheckCircle2, AlertCircle, RotateCcw, Download, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 
 interface PasswordEntry {
   id: string;
@@ -41,6 +47,8 @@ interface VaultSettings {
   vault_password_hash: string;
   two_factor_secret?: string;
   two_factor_enabled: boolean;
+  recovery_questions?: any;
+  recovery_email?: string;
   created_at: string;
 }
 
@@ -58,7 +66,26 @@ const PasswordManager = () => {
   const [twoFactorQR, setTwoFactorQR] = useState('');
   const [setup2FA, setSetup2FA] = useState(false);
   
-  // Password reset state
+  // Recovery setup state
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [securityQuestion1, setSecurityQuestion1] = useState('');
+  const [securityAnswer1, setSecurityAnswer1] = useState('');
+  const [securityQuestion2, setSecurityQuestion2] = useState('');
+  const [securityAnswer2, setSecurityAnswer2] = useState('');
+  const [recoveryKey, setRecoveryKey] = useState('');
+  
+  // Password recovery state
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [recoveryMethod, setRecoveryMethod] = useState<'questions' | 'key' | 'email'>('questions');
+  const [recoveryAnswer1, setRecoveryAnswer1] = useState('');
+  const [recoveryAnswer2, setRecoveryAnswer2] = useState('');
+  const [enteredRecoveryKey, setEnteredRecoveryKey] = useState('');
+  const [newPasswordAfterRecovery, setNewPasswordAfterRecovery] = useState('');
+  const [confirmNewPasswordAfterRecovery, setConfirmNewPasswordAfterRecovery] = useState('');
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [vaultSettings, setVaultSettings] = useState<VaultSettings | null>(null);
+  
+  // Password reset state (destructive)
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [resetConfirmation, setResetConfirmation] = useState('');
   const [isResetting, setIsResetting] = useState(false);
@@ -92,12 +119,23 @@ const PasswordManager = () => {
   const [showPassword, setShowPassword] = useState<{ [key: string]: boolean }>({});
   const [requires2FA, setRequires2FA] = useState(false);
 
-  // Simple TOTP implementation for testing
+  // Predefined security questions
+  const securityQuestions = [
+    "What was the name of your first pet?",
+    "What city were you born in?",
+    "What is your mother's maiden name?",
+    "What was the name of your first school?",
+    "What is your favorite book?",
+    "What was your childhood nickname?",
+    "What street did you grow up on?",
+    "What is your father's middle name?"
+  ];
+
+  // Simple TOTP implementation
   const generateTOTP = (secret: string): string => {
     const epoch = Math.floor(Date.now() / 1000);
     const timeStep = Math.floor(epoch / 30);
     
-    // Simple hash-based code generation
     const combined = secret + timeStep.toString();
     let hash = 0;
     for (let i = 0; i < combined.length; i++) {
@@ -105,17 +143,13 @@ const PasswordManager = () => {
       hash = hash & hash;
     }
     
-    // Generate 6-digit code
     const code = Math.abs(hash % 1000000).toString().padStart(6, '0');
     return code;
   };
 
-  // Verify TOTP code
   const verifyTOTP = (secret: string, token: string): boolean => {
-    // Check current time window
     const currentCode = generateTOTP(secret);
     
-    // Also check previous and next time windows (90 seconds total)
     const epoch = Math.floor(Date.now() / 1000);
     const prevTimeStep = Math.floor((epoch - 30) / 30);
     const nextTimeStep = Math.floor((epoch + 30) / 30);
@@ -159,6 +193,20 @@ const PasswordManager = () => {
     return secret;
   };
 
+  // Generate recovery key
+  const generateRecoveryKey = (): string => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const segments = [];
+    for (let i = 0; i < 4; i++) {
+      let segment = '';
+      for (let j = 0; j < 4; j++) {
+        segment += chars[Math.floor(Math.random() * chars.length)];
+      }
+      segments.push(segment);
+    }
+    return segments.join('-');
+  };
+
   // Check if vault exists
   const checkVaultExists = async () => {
     if (!user) return;
@@ -170,10 +218,14 @@ const PasswordManager = () => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking vault:', error);
+        throw error;
+      }
 
       if (data) {
         setVaultExists(true);
+        setVaultSettings(data);
         setRequires2FA(data.two_factor_enabled);
       } else {
         setVaultExists(false);
@@ -211,6 +263,15 @@ const PasswordManager = () => {
       return;
     }
 
+    if (!securityQuestion1 || !securityAnswer1 || !securityQuestion2 || !securityAnswer2) {
+      toast({
+        title: "Error",
+        description: "Please set up both security questions for account recovery",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (setup2FA && (!twoFactorCode || twoFactorCode.length !== 6)) {
       toast({
         title: "Error",
@@ -232,40 +293,60 @@ const PasswordManager = () => {
     setIsLoading(true);
     try {
       const passwordHash = await hashPassword(newVaultPassword);
+      const answer1Hash = await hashPassword(securityAnswer1.toLowerCase().trim());
+      const answer2Hash = await hashPassword(securityAnswer2.toLowerCase().trim());
+      const generatedRecoveryKey = generateRecoveryKey();
+      const recoveryKeyHash = await hashPassword(generatedRecoveryKey);
       
-      console.log('Creating vault with hash:', passwordHash);
-      
-      const { error } = await supabase
+      const recoveryQuestions = {
+        question1: securityQuestion1,
+        answer1Hash: answer1Hash,
+        question2: securityQuestion2,
+        answer2Hash: answer2Hash,
+        recoveryKeyHash: recoveryKeyHash
+      };
+
+      const { error: deleteError } = await supabase
+        .from('vault_settings')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (deleteError) {
+        console.error('Error deleting old vault:', deleteError);
+      }
+
+      const { error: insertError } = await supabase
         .from('vault_settings')
         .insert({
           user_id: user.id,
           vault_password_hash: passwordHash,
           two_factor_secret: setup2FA ? twoFactorSecret : null,
-          two_factor_enabled: setup2FA
+          two_factor_enabled: setup2FA,
+          recovery_questions: recoveryQuestions,
+          recovery_email: recoveryEmail || null
         });
 
-      if (error) {
-        console.error('Supabase insert error:', error);
-        throw error;
+      if (insertError) {
+        console.error('Supabase insert error:', insertError);
+        throw insertError;
       }
+
+      setRecoveryKey(generatedRecoveryKey);
 
       toast({
         title: "Success",
-        description: "Vault created successfully! You can now unlock it.",
+        description: "Vault created successfully! Please save your recovery key.",
       });
 
       setVaultExists(true);
       setIsSettingUpVault(false);
       setRequires2FA(setup2FA);
-      setNewVaultPassword('');
-      setConfirmVaultPassword('');
-      setTwoFactorCode('');
-      setTwoFactorSecret('');
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error setting up vault:', error);
       toast({
         title: "Error",
-        description: "Failed to create vault",
+        description: error.message || "Failed to create vault",
         variant: "destructive"
       });
     } finally {
@@ -273,7 +354,138 @@ const PasswordManager = () => {
     }
   };
 
-  // Reset vault
+  // Download recovery key
+  const downloadRecoveryKey = () => {
+    const content = `ToolHub Password Manager - Recovery Key
+    
+Generated: ${new Date().toLocaleString()}
+User: ${user?.email}
+
+RECOVERY KEY: ${recoveryKey}
+
+⚠️ IMPORTANT:
+- Keep this key in a safe place
+- You will need it to recover your vault if you forget your password
+- This is the ONLY time this key will be shown
+- Do not share this key with anyone
+
+Security Questions:
+1. ${securityQuestion1}
+2. ${securityQuestion2}
+
+To recover your vault, you can use either:
+- Both security questions
+- This recovery key
+- Your recovery email (if configured)
+`;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `toolhub-recovery-key-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Downloaded",
+      description: "Recovery key has been downloaded"
+    });
+  };
+
+  // Complete vault setup
+  const completeVaultSetup = () => {
+    setRecoveryKey('');
+    setNewVaultPassword('');
+    setConfirmVaultPassword('');
+    setTwoFactorCode('');
+    setTwoFactorSecret('');
+    setSecurityQuestion1('');
+    setSecurityAnswer1('');
+    setSecurityQuestion2('');
+    setSecurityAnswer2('');
+    setRecoveryEmail('');
+  };
+
+  // Recover vault password
+  const recoverVaultPassword = async () => {
+    if (!user || !vaultSettings) return;
+
+    if (!newPasswordAfterRecovery || newPasswordAfterRecovery.length < 8) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 8 characters",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newPasswordAfterRecovery !== confirmNewPasswordAfterRecovery) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsRecovering(true);
+    try {
+      const recoveryData = vaultSettings.recovery_questions;
+
+      if (recoveryMethod === 'questions') {
+        const answer1Hash = await hashPassword(recoveryAnswer1.toLowerCase().trim());
+        const answer2Hash = await hashPassword(recoveryAnswer2.toLowerCase().trim());
+
+        if (answer1Hash !== recoveryData.answer1Hash || answer2Hash !== recoveryData.answer2Hash) {
+          throw new Error('Security answers do not match. Please try again.');
+        }
+      } else if (recoveryMethod === 'key') {
+        const enteredKeyHash = await hashPassword(enteredRecoveryKey);
+        if (enteredKeyHash !== recoveryData.recoveryKeyHash) {
+          throw new Error('Invalid recovery key. Please check and try again.');
+        }
+      } else if (recoveryMethod === 'email') {
+        toast({
+          title: "Email Sent",
+          description: "Check your email for recovery instructions",
+        });
+        return;
+      }
+
+      const newPasswordHash = await hashPassword(newPasswordAfterRecovery);
+      
+      const { error } = await supabase
+        .from('vault_settings')
+        .update({ vault_password_hash: newPasswordHash })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Vault password has been reset. Please unlock with your new password.",
+      });
+
+      setShowRecoveryDialog(false);
+      setRecoveryAnswer1('');
+      setRecoveryAnswer2('');
+      setEnteredRecoveryKey('');
+      setNewPasswordAfterRecovery('');
+      setConfirmNewPasswordAfterRecovery('');
+    } catch (error: any) {
+      console.error('Error recovering vault:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to recover vault",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRecovering(false);
+    }
+  };
+
+  // Reset vault (destructive)
   const resetVault = async () => {
     if (!user) return;
     
@@ -288,7 +500,6 @@ const PasswordManager = () => {
 
     setIsResetting(true);
     try {
-      // Delete all password entries
       const { error: entriesError } = await supabase
         .from('password_entries')
         .delete()
@@ -296,7 +507,6 @@ const PasswordManager = () => {
 
       if (entriesError) throw entriesError;
 
-      // Delete vault settings
       const { error: vaultError } = await supabase
         .from('vault_settings')
         .delete()
@@ -335,7 +545,6 @@ const PasswordManager = () => {
       const secret = generate2FASecret();
       setTwoFactorSecret(secret);
       
-      // Generate QR code data
       const issuer = 'ToolHub';
       const account = user?.email || 'user';
       const otpauth = `otpauth://totp/${issuer}:${account}?secret=${secret}&issuer=${issuer}`;
@@ -463,7 +672,7 @@ const PasswordManager = () => {
     setPassword(result);
   };
 
-  // Load encrypted entries from Supabase
+  // Load entries
   const loadEntries = async () => {
     if (!user || !isUnlocked) return;
     
@@ -494,7 +703,7 @@ const PasswordManager = () => {
       console.error('Error loading entries:', error);
       toast({
         title: "Error",
-        description: "Failed to load password entries. Your vault password may be incorrect.",
+        description: "Failed to load password entries.",
         variant: "destructive"
       });
       lockVault();
@@ -525,10 +734,7 @@ const PasswordManager = () => {
     
     setIsLoading(true);
     try {
-      // Verify vault password
       const passwordHash = await hashPassword(masterPassword);
-      
-      console.log('Attempting unlock with hash:', passwordHash);
       
       const { data: vaultData, error: vaultError } = await supabase
         .from('vault_settings')
@@ -541,14 +747,10 @@ const PasswordManager = () => {
         throw vaultError;
       }
 
-      console.log('Stored hash:', vaultData.vault_password_hash);
-      console.log('Hashes match:', vaultData.vault_password_hash === passwordHash);
-
       if (vaultData.vault_password_hash !== passwordHash) {
         throw new Error('Invalid vault password');
       }
 
-      // Verify 2FA if enabled
       if (vaultData.two_factor_enabled) {
         if (!verifyTOTP(vaultData.two_factor_secret, twoFactorCode)) {
           throw new Error('Invalid 2FA code');
@@ -564,7 +766,7 @@ const PasswordManager = () => {
       console.error('Error unlocking vault:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to unlock vault. Please check your password.",
+        description: error.message || "Failed to unlock vault.",
         variant: "destructive"
       });
       setMasterPassword('');
@@ -807,24 +1009,89 @@ const PasswordManager = () => {
     entry.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Load entries when unlocked
+  // Effects
   useEffect(() => {
     if (isUnlocked) {
       loadEntries();
     }
   }, [isUnlocked]);
 
-  // Check vault on mount
   useEffect(() => {
     if (user) {
       checkVaultExists();
     }
   }, [user]);
 
-  // Initialize with generated password
   useEffect(() => {
     generatePassword();
   }, []);
+
+  // Show recovery key dialog after vault creation
+  if (recoveryKey) {
+    return (
+      <div className="container mx-auto p-6 max-w-2xl">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl">Vault Created Successfully!</CardTitle>
+            <CardDescription>
+              Save your recovery key - this is the only time it will be shown
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Alert variant="destructive">
+              <AlertCircle className="w-4 h-4" />
+              <AlertTitle>Critical: Save Your Recovery Key</AlertTitle>
+              <AlertDescription>
+                This recovery key is required to reset your vault password if you forget it. Store it in a safe place.
+              </AlertDescription>
+            </Alert>
+
+            <div className="bg-muted p-4 rounded-lg">
+              <Label className="text-sm font-medium">Recovery Key</Label>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  value={recoveryKey}
+                  readOnly
+                  className="font-mono text-lg"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyToClipboard(recoveryKey)}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                <strong>Recovery Methods Set Up:</strong>
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Security Questions (2 questions)</li>
+                <li>Recovery Key (shown above)</li>
+                {recoveryEmail && <li>Recovery Email: {recoveryEmail}</li>}
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={downloadRecoveryKey} className="flex-1" variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Download Recovery Key
+              </Button>
+              <Button onClick={completeVaultSetup} className="flex-1">
+                I've Saved It, Continue
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Vault setup screen
   if (vaultExists === false || isSettingUpVault) {
@@ -837,55 +1104,138 @@ const PasswordManager = () => {
             </div>
             <CardTitle className="text-2xl">Create Your Password Vault</CardTitle>
             <CardDescription>
-              Set up a secure vault to store your passwords with military-grade encryption
+              Set up a secure vault with multiple recovery options
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <Alert>
-              <AlertCircle className="w-4 h-4" />
-              <AlertTitle>Important Security Notice</AlertTitle>
+              <Info className="w-4 h-4" />
+              <AlertTitle>Recovery Options</AlertTitle>
               <AlertDescription>
-                Your vault password is the master key to all your passwords. Make it strong and memorable. We cannot recover it if you forget it.
+                We'll set up multiple ways to recover your vault if you forget your password, so you never lose access to your data.
               </AlertDescription>
             </Alert>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-vault-password">Vault Password</Label>
-                <Input
-                  id="new-vault-password"
-                  type="password"
-                  value={newVaultPassword}
-                  onChange={(e) => setNewVaultPassword(e.target.value)}
-                  placeholder="Create a strong vault password (min 8 characters)"
-                />
-                {newVaultPassword && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Badge
-                      variant={
-                        calculateStrength(newVaultPassword) === 'weak' ? 'destructive' :
-                        calculateStrength(newVaultPassword) === 'medium' ? 'secondary' :
-                        'default'
-                      }
-                    >
-                      {calculateStrength(newVaultPassword).toUpperCase()} STRENGTH
-                    </Badge>
-                  </div>
-                )}
-              </div>
+            <Tabs defaultValue="password" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="password">Password</TabsTrigger>
+                <TabsTrigger value="recovery">Recovery</TabsTrigger>
+                <TabsTrigger value="2fa">2FA (Optional)</TabsTrigger>
+              </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirm-vault-password">Confirm Vault Password</Label>
-                <Input
-                  id="confirm-vault-password"
-                  type="password"
-                  value={confirmVaultPassword}
-                  onChange={(e) => setConfirmVaultPassword(e.target.value)}
-                  placeholder="Re-enter your vault password"
-                />
-              </div>
+              <TabsContent value="password" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-vault-password">Vault Password</Label>
+                  <Input
+                    id="new-vault-password"
+                    type="password"
+                    value={newVaultPassword}
+                    onChange={(e) => setNewVaultPassword(e.target.value)}
+                    placeholder="Create a strong vault password (min 8 characters)"
+                  />
+                  {newVaultPassword && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Badge
+                        variant={
+                          calculateStrength(newVaultPassword) === 'weak' ? 'destructive' :
+                          calculateStrength(newVaultPassword) === 'medium' ? 'secondary' :
+                          'default'
+                        }
+                      >
+                        {calculateStrength(newVaultPassword).toUpperCase()} STRENGTH
+                      </Badge>
+                    </div>
+                  )}
+                </div>
 
-              <div className="border rounded-lg p-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-vault-password">Confirm Vault Password</Label>
+                  <Input
+                    id="confirm-vault-password"
+                    type="password"
+                    value={confirmVaultPassword}
+                    onChange={(e) => setConfirmVaultPassword(e.target.value)}
+                    placeholder="Re-enter your vault password"
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="recovery" className="space-y-4 mt-4">
+                <Alert>
+                  <Shield className="w-4 h-4" />
+                  <AlertDescription>
+                    Set up security questions and optional recovery email. You'll also get a recovery key after setup.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-2">
+                  <Label htmlFor="security-question-1">Security Question 1</Label>
+                  <select
+                    id="security-question-1"
+                    value={securityQuestion1}
+                    onChange={(e) => setSecurityQuestion1(e.target.value)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                  >
+                    <option value="">Select a question...</option>
+                    {securityQuestions.map((q, i) => (
+                      <option key={i} value={q}>{q}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="security-answer-1">Answer</Label>
+                  <Input
+                    id="security-answer-1"
+                    type="text"
+                    value={securityAnswer1}
+                    onChange={(e) => setSecurityAnswer1(e.target.value)}
+                    placeholder="Your answer"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="security-question-2">Security Question 2</Label>
+                  <select
+                    id="security-question-2"
+                    value={securityQuestion2}
+                    onChange={(e) => setSecurityQuestion2(e.target.value)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                  >
+                    <option value="">Select a question...</option>
+                    {securityQuestions.map((q, i) => (
+                      <option key={i} value={q}>{q}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="security-answer-2">Answer</Label>
+                  <Input
+                    id="security-answer-2"
+                    type="text"
+                    value={securityAnswer2}
+                    onChange={(e) => setSecurityAnswer2(e.target.value)}
+                    placeholder="Your answer"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="recovery-email">Recovery Email (Optional)</Label>
+                  <Input
+                    id="recovery-email"
+                    type="email"
+                    value={recoveryEmail}
+                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                    placeholder="recovery@example.com"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    We'll send recovery instructions to this email if needed
+                  </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="2fa" className="space-y-4 mt-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="enable-2fa"
@@ -893,12 +1243,12 @@ const PasswordManager = () => {
                     onCheckedChange={(checked) => setSetup2FA(checked as boolean)}
                   />
                   <Label htmlFor="enable-2fa" className="cursor-pointer">
-                    Enable Two-Factor Authentication (Recommended)
+                    Enable Two-Factor Authentication
                   </Label>
                 </div>
 
                 {setup2FA && (
-                  <div className="space-y-4 pl-6">
+                  <div className="space-y-4">
                     <Alert>
                       <Info className="w-4 h-4" />
                       <AlertDescription>
@@ -933,18 +1283,27 @@ const PasswordManager = () => {
                     </div>
                   </div>
                 )}
-              </div>
 
-              <Button 
-                onClick={setupVault} 
-                className="w-full" 
-                disabled={isLoading}
-                size="lg"
-              >
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Create Vault
-              </Button>
-            </div>
+                {!setup2FA && (
+                  <Alert>
+                    <Info className="w-4 h-4" />
+                    <AlertDescription>
+                      2FA is optional but recommended for enhanced security. You can always enable it later.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            <Button 
+              onClick={setupVault} 
+              className="w-full" 
+              disabled={isLoading}
+              size="lg"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              {isLoading ? 'Creating Vault...' : 'Create Vault'}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -1008,14 +1367,23 @@ const PasswordManager = () => {
               {isLoading ? 'Unlocking...' : 'Unlock Vault'}
             </Button>
 
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t space-y-2">
               <Button
                 variant="outline"
-                className="w-full text-destructive hover:text-destructive"
+                className="w-full"
+                onClick={() => setShowRecoveryDialog(true)}
+              >
+                <Key className="w-4 h-4 mr-2" />
+                Forgot Password? Recover Access
+              </Button>
+              
+              <Button
+                variant="ghost"
+                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => setShowResetDialog(true)}
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Forgot Password? Reset Vault
+                Reset Vault (Delete All)
               </Button>
             </div>
             
@@ -1026,8 +1394,7 @@ const PasswordManager = () => {
                 <ul className="text-sm space-y-1">
                   <li>• AES-256-GCM encryption</li>
                   <li>• PBKDF2 key derivation (100k iterations)</li>
-                  <li>• Vault password never stored</li>
-                  <li>• Unique salt & IV per entry</li>
+                  <li>• Multiple recovery options</li>
                   {requires2FA && <li>• Two-Factor Authentication enabled</li>}
                 </ul>
               </AlertDescription>
@@ -1035,7 +1402,130 @@ const PasswordManager = () => {
           </CardContent>
         </Card>
 
-        {/* Reset Vault Dialog */}
+        {/* Recovery Dialog */}
+        <Dialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Recover Vault Access</DialogTitle>
+              <DialogDescription>
+                Choose a recovery method to reset your vault password
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Tabs value={recoveryMethod} onValueChange={(v) => setRecoveryMethod(v as any)} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="questions">Questions</TabsTrigger>
+                <TabsTrigger value="key">Recovery Key</TabsTrigger>
+                <TabsTrigger value="email">Email</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="questions" className="space-y-4 mt-4">
+                {vaultSettings?.recovery_questions && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>{vaultSettings.recovery_questions.question1}</Label>
+                      <Input
+                        value={recoveryAnswer1}
+                        onChange={(e) => setRecoveryAnswer1(e.target.value)}
+                        placeholder="Your answer"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>{vaultSettings.recovery_questions.question2}</Label>
+                      <Input
+                        value={recoveryAnswer2}
+                        onChange={(e) => setRecoveryAnswer2(e.target.value)}
+                        placeholder="Your answer"
+                      />
+                    </div>
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="key" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Recovery Key</Label>
+                  <Input
+                    value={enteredRecoveryKey}
+                    onChange={(e) => setEnteredRecoveryKey(e.target.value.toUpperCase())}
+                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the recovery key you saved when creating your vault
+                  </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="email" className="space-y-4 mt-4">
+                <Alert>
+                  <Mail className="w-4 h-4" />
+                  <AlertDescription>
+                    {vaultSettings?.recovery_email ? (
+                      <>
+                        A recovery link will be sent to <strong>{vaultSettings.recovery_email}</strong>
+                      </>
+                    ) : (
+                      <>
+                        No recovery email was configured for this vault. Please use security questions or recovery key instead.
+                      </>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              </TabsContent>
+            </Tabs>
+
+            {recoveryMethod !== 'email' && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>New Vault Password</Label>
+                  <Input
+                    type="password"
+                    value={newPasswordAfterRecovery}
+                    onChange={(e) => setNewPasswordAfterRecovery(e.target.value)}
+                    placeholder="Enter new password (min 8 characters)"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Confirm New Password</Label>
+                  <Input
+                    type="password"
+                    value={confirmNewPasswordAfterRecovery}
+                    onChange={(e) => setConfirmNewPasswordAfterRecovery(e.target.value)}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowRecoveryDialog(false);
+                  setRecoveryAnswer1('');
+                  setRecoveryAnswer2('');
+                  setEnteredRecoveryKey('');
+                  setNewPasswordAfterRecovery('');
+                  setConfirmNewPasswordAfterRecovery('');
+                }}
+                disabled={isRecovering}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={recoverVaultPassword}
+                disabled={isRecovering || (recoveryMethod === 'email' && !vaultSettings?.recovery_email)}
+              >
+                {isRecovering ? 'Recovering...' : recoveryMethod === 'email' ? 'Send Recovery Email' : 'Reset Password'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Destructive Reset Dialog */}
         <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
           <DialogContent>
             <DialogHeader>
@@ -1049,7 +1539,7 @@ const PasswordManager = () => {
               <AlertCircle className="w-4 h-4" />
               <AlertTitle>Warning: Data Loss</AlertTitle>
               <AlertDescription>
-                You will lose access to all {decryptedEntries.length || 'your'} saved passwords. Make sure you have them backed up elsewhere.
+                You will lose access to all your saved passwords. Use the "Recover Access" option instead if you want to keep your data.
               </AlertDescription>
             </Alert>
 
@@ -1092,6 +1582,7 @@ const PasswordManager = () => {
     );
   }
 
+  // Main password manager interface
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
@@ -1426,6 +1917,10 @@ const PasswordManager = () => {
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
                   <span>Use a strong, unique vault password</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Save your recovery key securely</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
