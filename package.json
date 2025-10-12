@@ -67,7 +67,8 @@
     "zod": "^3.25.76",
     "fflate": "^0.8.2",
     "postal-mime": "^2.4.6",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "mammoth": "1.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
