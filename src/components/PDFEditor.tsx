@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Upload, FileText, Type, PenTool, Download } from 'lucide-react';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { Loader2, Upload, FileText, Type, PenTool, Download, AlertCircle } from 'lucide-react';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 const PDFEditor: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -13,12 +13,14 @@ const PDFEditor: React.FC = () => {
   const [textPosition, setTextPosition] = useState({ x: 50, y: 750 });
   const [signature, setSignature] = useState('');
   const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type === 'application/pdf') {
       setFileName(file.name);
+      setError(null);
       await loadPDF(file);
     } else if (file) {
       alert('Please select a PDF file.');
@@ -27,6 +29,7 @@ const PDFEditor: React.FC = () => {
 
   const loadPDF = async (file: File) => {
     setIsProcessing(true);
+    setError(null);
     try {
       const fileBytes = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(fileBytes);
@@ -34,7 +37,8 @@ const PDFEditor: React.FC = () => {
       console.log('PDF loaded successfully');
     } catch (error) {
       console.error('Error loading PDF:', error);
-      alert('Error loading PDF. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Error loading PDF: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
@@ -50,8 +54,6 @@ const PDFEditor: React.FC = () => {
       return;
     }
     
-    // For demo purposes, we'll just show a success message
-    // In a full implementation, you would modify the PDFDocument
     alert(`Text "${textToAdd}" will be added at position (${textPosition.x}, ${textPosition.y})`);
     setTextToAdd('');
   };
@@ -71,6 +73,7 @@ const PDFEditor: React.FC = () => {
     }
     
     setIsProcessing(true);
+    setError(null);
     try {
       // Get the first page to modify
       const pages = pdfDoc.getPages();
@@ -78,7 +81,7 @@ const PDFEditor: React.FC = () => {
         const firstPage = pages[0];
         const { width, height } = firstPage.getSize();
         
-        const font = await pdfDoc.embedFont(PDFDocument.Font.Helvetica);
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         
         // Add the user's text if provided
         if (textToAdd.trim()) {
@@ -131,7 +134,8 @@ const PDFEditor: React.FC = () => {
       
     } catch (error) {
       console.error('Error saving PDF:', error);
-      alert('Error saving PDF. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Error saving PDF: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
@@ -142,6 +146,7 @@ const PDFEditor: React.FC = () => {
     const file = event.dataTransfer.files[0];
     if (file && file.type === 'application/pdf') {
       setFileName(file.name);
+      setError(null);
       await loadPDF(file);
     }
   };
@@ -182,7 +187,7 @@ const PDFEditor: React.FC = () => {
               </p>
             </div>
 
-            {fileName && (
+            {fileName && !error && (
               <p className="text-sm text-green-600 font-medium bg-green-50 p-2 rounded-lg">
                 ✓ Loaded: {fileName}
               </p>
@@ -190,6 +195,21 @@ const PDFEditor: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Error Display */}
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+              <div>
+                <p className="font-medium text-red-900">Error</p>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Editing Tools - Only show when PDF is loaded */}
       {fileName && !isProcessing && pdfDoc && (
